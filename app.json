@@ -1,0 +1,12 @@
+{
+  "pages": [
+    "page/component/jdraw/jdraw"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#fff",
+    "navigationBarTitleText": "笔记画板",
+    "navigationBarTextStyle": "black"
+  },
+  "sitemapLocation": "sitemap.json"
+}
