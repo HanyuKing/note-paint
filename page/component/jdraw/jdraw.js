@@ -411,6 +411,10 @@ Page({
     // 清空画布
     this.context.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
 
+    // 填充白色背景
+    this.context.setFillStyle('#ffffff');
+    this.context.fillRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
+
     // 应用变换
     this.context.save();
     this.context.scale(this.data.scale, this.data.scale);
@@ -570,51 +574,57 @@ Page({
       title: '正在保存...',
     });
 
-    // 使用canvasToTempFilePath导出图片
-    wx.canvasToTempFilePath({
-      canvasId: 'palette',
-      success: function (res) {
-        // 保存到相册
-        wx.saveImageToPhotosAlbum({
-          filePath: res.tempFilePath,
-          success: function () {
-            wx.hideLoading();
-            wx.showToast({
-              title: '保存成功',
-              icon: 'success',
-              duration: 2000
-            });
-          },
-          fail: function (err) {
-            wx.hideLoading();
-            if (err.errMsg === 'saveImageToPhotosAlbum:fail auth deny') {
-              wx.showModal({
-                title: '提示',
-                content: '需要您授权保存相册',
-                showCancel: false,
-                confirmText: '去设置',
-                success: function () {
-                  wx.openSetting();
-                }
-              });
-            } else {
+    // 重新绘制一次以确保白底渲染完成，并在回调中保存
+    // 强制不透明：因为 redrawCanvas 第一步就是 fillRect 白色
+    this.redrawCanvas();
+
+    // 注意：redrawCanvas 里调用了 context.draw()。
+    // 为了稳妥，我们在这里手动再 draw 一次并利用回调
+    this.context.draw(true, () => {
+      wx.canvasToTempFilePath({
+        canvasId: 'palette',
+        fileType: 'png',
+        success: function (res) {
+          wx.saveImageToPhotosAlbum({
+            filePath: res.tempFilePath,
+            success: function () {
+              wx.hideLoading();
               wx.showToast({
-                title: '保存失败',
-                icon: 'none'
+                title: '保存成功',
+                icon: 'success',
+                duration: 2000
               });
+            },
+            fail: function (err) {
+              wx.hideLoading();
+              if (err.errMsg === 'saveImageToPhotosAlbum:fail auth deny') {
+                wx.showModal({
+                  title: '提示',
+                  content: '需要您授权保存相册',
+                  showCancel: false,
+                  confirmText: '去设置',
+                  success: function () {
+                    wx.openSetting();
+                  }
+                });
+              } else {
+                wx.showToast({
+                  title: '保存失败',
+                  icon: 'none'
+                });
+              }
             }
-          }
-        });
-      },
-      fail: function (err) {
-        wx.hideLoading();
-        wx.showToast({
-          title: '导出失败',
-          icon: 'none'
-        });
-        console.error('导出图片失败:', err);
-      }
-    }, that);
+          });
+        },
+        fail: function (err) {
+          wx.hideLoading();
+          wx.showToast({
+            title: '导出失败',
+            icon: 'none'
+          });
+        }
+      }, that);
+    });
   },
   //更改画笔颜色
   tinColorChange: function (e) {
