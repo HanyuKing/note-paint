@@ -111,22 +111,22 @@ Page({
   expandCanvasBounds: function (x, y) {
     let bounds = this.data.canvasBounds;
     let needUpdate = false;
-    const padding = 200;
+    const padding = 50;
 
     if (x < bounds.minX) {
-      bounds.minX = x - padding;
+      bounds.minX = Math.floor(x - padding);
       needUpdate = true;
     }
     if (x > bounds.maxX) {
-      bounds.maxX = x + padding;
+      bounds.maxX = Math.ceil(x + padding);
       needUpdate = true;
     }
     if (y < bounds.minY) {
-      bounds.minY = y - padding;
+      bounds.minY = Math.floor(y - padding);
       needUpdate = true;
     }
     if (y > bounds.maxY) {
-      bounds.maxY = y + padding;
+      bounds.maxY = Math.ceil(y + padding);
       needUpdate = true;
     }
 
@@ -305,18 +305,30 @@ Page({
       newTranslateX += moveX;
       newTranslateY += moveY;
 
-      this.setData({
-        scale: newScale,
-        translateX: newTranslateX,
-        translateY: newTranslateY,
-        lastTouchDistance: currentDistance,
-        lastPanPoint: { x: centerX, y: centerY }
-      });
+      // 性能优化：直接修改 data 而不是 setData
+      this.data.scale = newScale;
+      this.data.translateX = newTranslateX;
+      this.data.translateY = newTranslateY;
+      this.data.lastTouchDistance = currentDistance;
+      this.data.lastPanPoint = { x: centerX, y: centerY };
 
-      this.redrawCanvas();
+      // 显示缩放比例 (已隐藏)
+      // const newPercent = Math.round(newScale * 100);
+      // if (newPercent !== this.data.scalePercent) {
+      //   this.setData({
+      //     scalePercent: newPercent,
+      //     showScaleToast: true
+      //   });
+      // }
+
+      const now = Date.now();
+      if (now - (this.lastRenderTime || 0) > 20) {
+        this.redrawCanvas(true); // Enable LOD
+        this.lastRenderTime = now;
+      }
 
     } else if (this.data.isPanning && touches.length === 1) {
-      // 平移模式 (Select Mode Empty Drag)
+      // 平移模式
       const touch = touches[0];
       if (this.data.lastPanPoint) {
         const deltaX = touch.x - this.data.lastPanPoint.x;
@@ -338,14 +350,15 @@ Page({
       this.data.longPressTimer = null;
     }
 
-    // 重置手势状态 (注意保留 currentMode/activeObjectId 等)
+    // 重置手势状态
     this.setData({
       isDrawing: false,
       isPanning: false,
-      isZooming: false, // 结束缩放
-      isDraggingObject: false, // 结束拖拽对象
+      isZooming: false,
+      isDraggingObject: false,
       lastPanPoint: null,
-      lastTouchDistance: 0
+      lastTouchDistance: 0,
+      showScaleToast: false // 隐藏缩放提示
     });
   },
   //绘制单条线

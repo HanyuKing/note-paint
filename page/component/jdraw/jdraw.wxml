@@ -35,6 +35,8 @@
     <canvas style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;" canvas-id="palette" bindtouchstart='touchstart' bindtouchmove='touchMove' bindtouchend='touchEnd' disable-scroll='true' hidden="{{showTutorial}}"></canvas>
     <!-- 隐形画布用于导出，尺寸动态绑定 exportWidth/Height，移出屏幕外 -->
     <canvas style="width: {{exportWidth}}px; height: {{exportHeight}}px; position: fixed; left: 10000px; top: 0;" canvas-id="exportCanvas"></canvas>
+
+
   </view>
   
   <!-- 使用说明弹窗 (回归标准 View，通过隐藏 Canvas 解决层级问题) -->

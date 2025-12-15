@@ -147,6 +147,29 @@
   visibility: visible;
 }
 
+/* 缩放比例提示 (Center Toast) */
+.jdraw .zoom-toast {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); /* Center it */
+  background-color: rgba(0, 0, 0, 0.7);
+  padding: 15px 30px;
+  border-radius: 12px;
+  z-index: 200;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* cover-view support limited styles, backdrop-filter might not work on native canvas overlay, but try */
+}
+
+.jdraw .zoom-text {
+  color: #fff;
+  font-size: 28px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
 .jdraw .tutorial-modal {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border-radius: 20px;
