@@ -524,18 +524,21 @@ Page({
               },
               fail: function (err) {
                 wx.hideLoading();
-                if (err.errMsg === 'saveImageToPhotosAlbum:fail auth deny') {
+                // 兼容不同机型的权限拒绝报错
+                if (err.errMsg.indexOf('auth') > -1 || err.errMsg.indexOf('deny') > -1) {
                   wx.showModal({
                     title: '保存失败',
-                    content: '需要您授权保存相册',
+                    content: '请授权保存相册，以便将作品保存到您的手机',
                     showCancel: false,
-                    confirmText: '去设置',
-                    success: function () {
-                      wx.openSetting();
+                    confirmText: '去授权',
+                    success: function (res) {
+                      if (res.confirm) {
+                        wx.openSetting();
+                      }
                     }
                   });
                 } else {
-                  wx.showToast({ title: '保存失败', icon: 'none' });
+                  wx.showToast({ title: '保存失败: ' + err.errMsg, icon: 'none' });
                 }
               }
             });
