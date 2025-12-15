@@ -141,24 +141,9 @@ Page({
   touchstart: function (e) {
     const touches = e.touches;
 
-    // 清理之前的长按定时器
-    if (this.data.longPressTimer) {
-      clearTimeout(this.data.longPressTimer);
-    }
-
     if (touches.length === 1) {
       // 单指触摸
       const touch = touches[0];
-
-      // 设置长按定时器（500ms）
-      this.data.longPressTimer = setTimeout(() => {
-        this.setData({
-          isPanning: true,
-          isDrawing: false,
-          lastPanPoint: { x: touch.x, y: touch.y }
-        });
-        wx.vibrateShort(); // 震动反馈
-      }, 500);
 
       // 根据模式判断行为
       if (this.data.currentMode === 'select') {
@@ -170,7 +155,6 @@ Page({
           const obj = objects[i];
           const box = obj.itemBox;
           // 简单的矩形碰撞检测
-          // 注意：box 存储的是绝对坐标，不需要加 obj.x/y，因为我们在 move 时会更新 box
           if (canvasPos.x >= box.minX + (obj.x || 0) && canvasPos.x <= box.maxX + (obj.x || 0) &&
             canvasPos.y >= box.minY + (obj.y || 0) && canvasPos.y <= box.maxY + (obj.y || 0)) {
 
@@ -185,21 +169,25 @@ Page({
         }
 
         if (!found) {
-          // 点击空白处，取消选中
+          // 点击空白处：取消选中 + 开启平移
           this.setData({
             activeObjectId: null,
-            isDraggingObject: false
-            // 未来可以在这里触发框选或平移
+            isDraggingObject: false,
+            isPanning: true,
+            lastPanPoint: { x: touch.x, y: touch.y }
           });
         }
         this.redrawCanvas();
 
       } else {
-        // 绘画模式
+        // 绘画模式 ... (unchanged)
         let tinct, lineWidth;
-        if (this.data.brushState == 'p') {
-          tinct = this.data.tinctList[this.data.tinctCurr];
-          lineWidth = this.data.tinctSize;
+        const currentBrushState = this.data.brushState || 'p';
+        if (currentBrushState == 'p') {
+          const colorList = this.data.tinctList || [];
+          const colorIndex = this.data.tinctCurr || 0;
+          tinct = colorList[colorIndex] || '#000000';
+          lineWidth = this.data.tinctSize || 5;
         } else {
           tinct = "#ffffff";
           lineWidth = 20;
@@ -210,27 +198,22 @@ Page({
         this.context.setStrokeStyle(tinct);
         this.context.setLineWidth(lineWidth);
 
-        // 转换坐标
         const canvasPos = this.screenToCanvas(touch.x, touch.y);
-
-        // 扩展画布边界
         this.expandCanvasBounds(canvasPos.x, canvasPos.y);
 
         this.setData({
           isDrawing: true
         });
 
-        // 创建新的 Path 对象
         const newPathObject = {
           id: 'path_' + Date.now(),
           type: 'path',
-          x: 0, y: 0, // 初始位移为0
+          x: 0, y: 0,
           points: [canvasPos],
           style: {
             color: tinct,
             width: lineWidth
           },
-          // 初始包围盒
           itemBox: {
             minX: canvasPos.x, maxX: canvasPos.x,
             minY: canvasPos.y, maxY: canvasPos.y
@@ -241,52 +224,36 @@ Page({
       }
 
     } else if (touches.length === 2) {
-      // 双指触摸 - 缩放模式
+      // ... (unchanged)
+      const centerX = (touches[0].x + touches[1].x) / 2;
+      const centerY = (touches[0].y + touches[1].y) / 2;
+
       this.setData({
         isDrawing: false,
-        isPanning: false,
         isZooming: true,
-        lastTouchDistance: this.getDistance(touches[0], touches[1])
+        lastTouchDistance: this.getDistance(touches[0], touches[1]),
+        lastPanPoint: { x: centerX, y: centerY }
       });
-
-      // 清理长按定时器
-      if (this.data.longPressTimer) {
-        clearTimeout(this.data.longPressTimer);
-        this.data.longPressTimer = null;
-      }
     }
   },
   touchMove: function (e) {
     const touches = e.touches;
 
-    // Object Dragging (Select Mode)
+    // ... (unchanged object dragging)
     if (this.data.currentMode === 'select' && this.data.isDraggingObject && touches.length === 1 && this.data.activeObjectId) {
       const touch = touches[0];
-      // 计算屏幕位移
       const dx_screen = touch.x - this.data.lastDragPoint.x;
       const dy_screen = touch.y - this.data.lastDragPoint.y;
 
-      // 转换为画布位移
       const dx_canvas = dx_screen / this.data.scale;
       const dy_canvas = dy_screen / this.data.scale;
 
-      // 更新当前对象
       const objects = this.data.graphObjects;
       const obj = objects.find(o => o.id === this.data.activeObjectId);
 
       if (obj) {
-        // 更新位移
         obj.x = (obj.x || 0) + dx_canvas;
         obj.y = (obj.y || 0) + dy_canvas;
-
-        // 同步更新包围盒 (ItemBox)
-        // 注意：itemBox 存储的是原始坐标，obj.x/y 是位移，所以这里不需要更新 itemBox
-        // itemBox 应该只反映对象本身的尺寸，位移通过 obj.x/y 统一管理
-        // obj.itemBox.minX += dx_canvas;
-        // obj.itemBox.maxX += dx_canvas;
-        // obj.itemBox.minY += dy_canvas;
-        // obj.itemBox.maxY += dy_canvas;
-
         this.setData({
           lastDragPoint: { x: touch.x, y: touch.y }
         });
@@ -296,34 +263,21 @@ Page({
     }
 
     if (this.data.isDrawing && touches.length === 1) {
-      // 绘画模式
+      // ... (unchanged drawing)
       const touch = touches[0];
       const canvasPos = this.screenToCanvas(touch.x, touch.y);
-
-      // 扩展画布边界
       this.expandCanvasBounds(canvasPos.x, canvasPos.y);
-
       const objects = this.data.graphObjects;
-      const currentObj = objects[objects.length - 1]; // 当前正在画的对象
+      const currentObj = objects[objects.length - 1];
 
       if (currentObj && currentObj.type === 'path') {
-        // --- 路径简化优化 ---
-        // 获取上一个点
         const lastPoint = currentObj.points[currentObj.points.length - 1];
-        // 计算距离 (平方距即可，避免开方)
         const dx = canvasPos.x - lastPoint.x;
         const dy = canvasPos.y - lastPoint.y;
         const distSq = dx * dx + dy * dy;
-
-        // 阈值：2px (即平方 4)。小于该距离则忽略，减少点数
-        if (distSq < 4) {
-          return;
-        }
-        // -------------------
+        if (distSq < 4) return;
 
         currentObj.points.push(canvasPos);
-
-        // 更新包围盒
         currentObj.itemBox.minX = Math.min(currentObj.itemBox.minX, canvasPos.x);
         currentObj.itemBox.maxX = Math.max(currentObj.itemBox.maxX, canvasPos.x);
         currentObj.itemBox.minY = Math.min(currentObj.itemBox.minY, canvasPos.y);
@@ -332,36 +286,37 @@ Page({
         this.bindDraw(currentObj.points);
       }
 
-
     } else if (this.data.isZooming && touches.length === 2) {
-      // 缩放模式
+      // ... (unchanged zooming)
       const currentDistance = this.getDistance(touches[0], touches[1]);
       const scaleChange = currentDistance / this.data.lastTouchDistance;
-
-      // 限制缩放范围 - 最小0.1倍，最大无限制
       let newScale = this.data.scale * scaleChange;
-      newScale = Math.max(0.05, newScale); // 只限制最小缩放，支持无限放大
+      newScale = Math.max(0.05, newScale);
 
-      // 计算缩放中心点
       const centerX = (touches[0].x + touches[1].x) / 2;
       const centerY = (touches[0].y + touches[1].y) / 2;
 
-      // 调整平移量以保持缩放中心点不变
-      const newTranslateX = centerX - (centerX - this.data.translateX) * (newScale / this.data.scale);
-      const newTranslateY = centerY - (centerY - this.data.translateY) * (newScale / this.data.scale);
+      const moveX = centerX - this.data.lastPanPoint.x;
+      const moveY = centerY - this.data.lastPanPoint.y;
+
+      let newTranslateX = centerX - (centerX - this.data.translateX) * (newScale / this.data.scale);
+      let newTranslateY = centerY - (centerY - this.data.translateY) * (newScale / this.data.scale);
+
+      newTranslateX += moveX;
+      newTranslateY += moveY;
 
       this.setData({
         scale: newScale,
         translateX: newTranslateX,
         translateY: newTranslateY,
-        lastTouchDistance: currentDistance
+        lastTouchDistance: currentDistance,
+        lastPanPoint: { x: centerX, y: centerY }
       });
 
-      // 重绘画布
       this.redrawCanvas();
 
     } else if (this.data.isPanning && touches.length === 1) {
-      // 平移模式
+      // 平移模式 (Select Mode Empty Drag)
       const touch = touches[0];
       if (this.data.lastPanPoint) {
         const deltaX = touch.x - this.data.lastPanPoint.x;
@@ -373,34 +328,25 @@ Page({
           lastPanPoint: { x: touch.x, y: touch.y }
         });
 
-        // 重绘画布
         this.redrawCanvas();
       }
     }
-
-    // 如果有移动，清理长按定时器
-    if (this.data.longPressTimer) {
-      clearTimeout(this.data.longPressTimer);
-      this.data.longPressTimer = null;
-    }
   },
   touchEnd: function (e) {
-    // 清理长按定时器
     if (this.data.longPressTimer) {
       clearTimeout(this.data.longPressTimer);
       this.data.longPressTimer = null;
     }
 
-    // 重置手势状态
+    // 重置手势状态 (注意保留 currentMode/activeObjectId 等)
     this.setData({
       isDrawing: false,
       isPanning: false,
-      isZooming: false,
+      isZooming: false, // 结束缩放
+      isDraggingObject: false, // 结束拖拽对象
       lastPanPoint: null,
       lastTouchDistance: 0
     });
-
-    // console.log(this.data.points);
   },
   //绘制单条线
   bindDraw: function (point) {
@@ -420,53 +366,34 @@ Page({
     this.context.draw(true);
   },
 
-  //重绘整个画布
-  redrawCanvas: function (isExport = false) {
-    // 导出模式下：使用全尺寸覆盖
-    // 正常模式下：使用当前视图变换(scale/translate)
-
-    let sc = this.data.scale;
-    let tx = this.data.translateX;
-    let ty = this.data.translateY;
-
-    if (isExport) {
-      // 导出时，强制缩放为 1（或根据需求调整）
-      sc = 1;
-      // 导出时，将画布原点对齐到内容边界的左上角
-      // 这样可以确保 minX/minY 处的内容被画在 canvas 的 (0,0) 处
-      tx = -this.data.canvasBounds.minX;
-      ty = -this.data.canvasBounds.minY;
-    }
-
+  // 核心渲染逻辑 (支持渲染到不同 Context)
+  renderToContext: function (ctx, width, height, scale, tx, ty, isExport) {
     // 清空画布
-    this.context.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
+    ctx.clearRect(0, 0, width, height);
 
     // 填充白色背景
-    this.context.setFillStyle('#ffffff');
-    this.context.fillRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
+    ctx.setFillStyle('#ffffff');
+    ctx.fillRect(0, 0, width, height);
 
     // 应用变换
-    this.context.save();
-    this.context.scale(sc, sc);
-    this.context.translate(tx / sc, ty / sc);
+    ctx.save();
+    ctx.scale(scale, scale);
+    ctx.translate(tx / scale, ty / scale);
 
     // 重绘所有对象
     let objects = this.data.graphObjects;
 
     // --- 视口剔除 (Viewport Culling) ---
-    // 仅在非导出模式下启用
     if (!isExport) {
-      // 计算当前屏幕可见的画布范围 (矩形)
+      // 计算当前屏幕可见范围
       const buffer = 100;
-      const vX = -this.data.translateX / this.data.scale - buffer;
-      const vY = -this.data.translateY / this.data.scale - buffer;
-      const vW = (this.data.screenWidth / this.data.scale) + (buffer * 2);
-      const vH = (this.data.screenHeight / this.data.scale) + (buffer * 2);
+      const vX = -tx / scale - buffer;
+      const vY = -ty / scale - buffer;
+      const vW = (width / scale) + (buffer * 2);
+      const vH = (height / scale) + (buffer * 2);
 
       for (let i = 0; i < objects.length; i++) {
         const obj = objects[i];
-
-        // --- 视口碰撞检测 ---
         const box = obj.itemBox;
         const objMinX = box.minX + (obj.x || 0);
         const objMaxX = box.maxX + (obj.x || 0);
@@ -475,48 +402,62 @@ Page({
 
         if (objMinX > vX + vW || objMaxX < vX ||
           objMinY > vY + vH || objMaxY < vY) {
-          continue; // 剔除！
+          continue;
         }
 
-        this.drawObject(obj); // 封装绘制逻辑以复用
+        this.drawObject(ctx, obj);
       }
     } else {
-      // 导出模式：不剔除，全量绘制
+      // 导出模式：全量绘制
       for (let i = 0; i < objects.length; i++) {
-        this.drawObject(objects[i]);
+        this.drawObject(ctx, objects[i]);
       }
     }
 
-    this.context.restore();
-    this.context.draw();
+    ctx.restore();
+    // ctx.draw() 由调用方决定是否有回调
+  },
+
+  // 重绘主画布
+  redrawCanvas: function () {
+    this.renderToContext(
+      this.context,
+      this.data.canvasWidth,
+      this.data.canvasHeight,
+      this.data.scale,
+      this.data.translateX,
+      this.data.translateY,
+      false // isExport
+    );
+    this.context.draw(); // Call draw for the main canvas
   },
 
   // 抽离单个对象绘制逻辑
-  drawObject: function (obj) {
+  drawObject: function (ctx, obj) {
     if (obj.type === 'path') {
-      // 绘制路径
       if (obj.points.length > 0) {
-        this.context.setStrokeStyle(obj.style.color);
-        this.context.setLineWidth(obj.style.width);
-        this.context.setLineCap('round');
-        this.context.setLineJoin('round');
+        ctx.setStrokeStyle(obj.style.color);
+        ctx.setLineWidth(obj.style.width);
+        ctx.setLineCap('round');
+        ctx.setLineJoin('round');
 
-        this.context.beginPath();
-        this.context.moveTo(obj.points[0].x + (obj.x || 0), obj.points[0].y + (obj.y || 0));
+        ctx.beginPath();
+        ctx.moveTo(obj.points[0].x + (obj.x || 0), obj.points[0].y + (obj.y || 0));
         for (let j = 1; j < obj.points.length; j++) {
-          this.context.lineTo(obj.points[j].x + (obj.x || 0), obj.points[j].y + (obj.y || 0));
+          ctx.lineTo(obj.points[j].x + (obj.x || 0), obj.points[j].y + (obj.y || 0));
         }
-        this.context.stroke();
+        ctx.stroke();
       }
     } else if (obj.type === 'image') {
-      // 绘制图片
-      this.context.drawImage(obj.src, obj.x, obj.y, obj.w, obj.h);
+      ctx.drawImage(obj.src, obj.x, obj.y, obj.w, obj.h);
     }
 
-    // 绘制选中框 (如果被选中)
+    // 绘制选中框 (主画布且此时不是导出时，或者导出也想绘制选中框？一般导出不画选中框)
+    // 注意：这里 activeObjectId 通常只在 UI 交互中有意义
+    // 如果需要在导出时隐藏选中框，可增加参数控制。这里暂保持一致。
     if (this.data.activeObjectId === obj.id) {
-      this.context.setStrokeStyle('#1aad19');
-      this.context.setLineWidth(2);
+      ctx.setStrokeStyle('#1aad19');
+      ctx.setLineWidth(2);
 
       let box = obj.itemBox;
       const finalX = box.minX + (obj.x || 0);
@@ -524,11 +465,11 @@ Page({
       const finalW = box.maxX - box.minX;
       const finalH = box.maxY - box.minY;
 
-      this.context.strokeRect(finalX - 5, finalY - 5, finalW + 10, finalH + 10);
+      ctx.strokeRect(finalX - 5, finalY - 5, finalW + 10, finalH + 10);
     }
   },
 
-  // 保存图片到相册
+  // 保存图片到相册 (离屏渲染方案)
   saveToAlbum: function () {
     const that = this;
     wx.showLoading({
@@ -537,30 +478,39 @@ Page({
 
     // 1. 计算完整内容的宽高
     const bounds = this.data.canvasBounds;
-    // 留一点边距 (padding)
     const padding = 50;
     const fullWidth = (bounds.maxX - bounds.minX) + padding * 2;
     const fullHeight = (bounds.maxY - bounds.minY) + padding * 2;
 
-    // 记录原始画布尺寸 (通常是屏幕大小)
-    const originalWidth = this.data.screenWidth;
-
-    // 2. 临时调整画布尺寸以容纳所有内容
+    // 2. 设置离屏画布尺寸
     this.setData({
-      canvasWidth: fullWidth,
-      canvasHeight: fullHeight
+      exportWidth: fullWidth,
+      exportHeight: fullHeight
     }, () => {
-      // setData 回调，此时 canvas DOM 大小已变
+      // 3. 创建离屏画布上下文
+      const exportCtx = wx.createCanvasContext('exportCanvas', that);
 
-      // 3. 切换到导出模式 (全量绘制 + 重置视图)
-      that.redrawCanvas(true);
+      // 4. 计算对齐参数 (Scale=1, Translate以左上角为原点)
+      const tx = -bounds.minX + padding;
+      const ty = -bounds.minY + padding; // 加上 padding 居中一点
 
-      // 4. 等待绘制完成后导出
-      that.context.draw(true, () => {
+      // 5. 渲染到离屏画布
+      // 这里不调用 redrawCanvas，而是调用核心渲染方法
+      that.renderToContext(
+        exportCtx,
+        fullWidth,
+        fullHeight,
+        1, // scale
+        tx, ty, // translate
+        true // isExport
+      );
+
+      // 6. 导出
+      // 在 renderToContext 后，我们需要一次带回调的 draw 此时才能确保离屏渲染完成
+      exportCtx.draw(true, () => {
         wx.canvasToTempFilePath({
-          canvasId: 'palette',
+          canvasId: 'exportCanvas',
           fileType: 'png',
-          // 指定导出的区域为整个巨型画布
           destWidth: fullWidth,
           destHeight: fullHeight,
           width: fullWidth,
@@ -570,13 +520,7 @@ Page({
               filePath: res.tempFilePath,
               success: function () {
                 wx.hideLoading();
-                wx.showToast({
-                  title: '保存成功',
-                  icon: 'success',
-                  duration: 2000
-                });
-                // 5. 恢复正常视图和尺寸
-                that.restoreAfterSave(originalWidth);
+                wx.showToast({ title: '保存成功', icon: 'success' });
               },
               fail: function (err) {
                 wx.hideLoading();
@@ -591,36 +535,24 @@ Page({
                     }
                   });
                 } else {
-                  wx.showToast({
-                    title: '保存失败',
-                    icon: 'none'
-                  });
+                  wx.showToast({ title: '保存失败', icon: 'none' });
                 }
-                that.restoreAfterSave(originalWidth);
               }
             });
           },
-          fail: function (err) {
+          fail: function () {
             wx.hideLoading();
-            wx.showToast({
-              title: '导出失败',
-              icon: 'none'
-            });
-            that.restoreAfterSave(originalWidth);
+            wx.showToast({ title: '导出失败', icon: 'none' });
           }
         }, that);
       });
     });
   },
 
-  // 保存后的恢复逻辑
+  // 保存后的恢复逻辑 (不再需要，因为主画布未被修改)
   restoreAfterSave: function (originalWidth) {
-    this.setData({
-      canvasWidth: 800, // 这里简单重置回默认 800 或者上次记录的值
-      canvasHeight: 1000
-    }, () => {
-      this.redrawCanvas(false);
-    });
+    // This function is no longer needed as the main canvas state is not altered during export.
+    // The main canvas will retain its current view and dimensions.
   },
 
   //绘制回退
@@ -652,11 +584,89 @@ Page({
       translateY: 0
     });
   },
+  // 切换画笔/橡皮檫 (并自动进入绘画模式)
+  switchBrush: function (e) {
+    this.setData({
+      currentMode: 'draw',
+      brushState: e.currentTarget.dataset.state
+    });
+  },
+
+  // 切换模式
+  switchMode: function (e) {
+    const mode = e.currentTarget.dataset.mode;
+    this.setData({
+      currentMode: mode,
+      activeObjectId: null // 切换模式时取消选中
+    });
+    this.redrawCanvas();
+  },
+
+  // 选择图片
+  chooseImage: function () {
+    const that = this;
+    wx.chooseImage({
+      count: 1,
+      sourceType: ['album', 'camera'],
+      success: (res) => {
+        const tempFilePath = res.tempFilePaths[0];
+        wx.getImageInfo({
+          src: tempFilePath,
+          success: (info) => {
+            // 计算显示尺寸，默认限制宽度 200
+            const ratio = info.width / info.height;
+            const w = 200;
+            const h = 200 / ratio;
+
+            // 放在屏幕中心 (转画布坐标)
+            const cx = that.data.screenWidth / 2;
+            const cy = that.data.screenHeight / 2;
+            const canvasPos = that.screenToCanvas(cx, cy);
+
+            const newImg = {
+              id: 'img_' + Date.now(),
+              type: 'image',
+              src: tempFilePath,
+              x: canvasPos.x - w / 2,
+              y: canvasPos.y - h / 2,
+              w: w,
+              h: h,
+              // 包围盒
+              itemBox: {
+                minX: 0,
+                maxX: w,
+                minY: 0,
+                maxY: h
+              }
+            };
+
+            that.data.graphObjects.push(newImg);
+            // 扩展边界以包含图片
+            // 注意：expandCanvasBounds 需要绝对坐标
+            that.expandCanvasBounds(newImg.x, newImg.y);
+            that.expandCanvasBounds(newImg.x + w, newImg.y + h);
+
+            that.redrawCanvas();
+          }
+        })
+      }
+    })
+  },
+
+  // 显示/关闭教程
+  showTutorialAgain: function () {
+    this.setData({ showTutorial: true });
+  },
+  closeTutorial: function () {
+    this.setData({ showTutorial: false });
+  },
+
   //更改画笔颜色
   tinColorChange: function (e) {
     const index = e.currentTarget.dataset.index;
     this.setData({
-      tinctCurr: index
+      tinctCurr: index,
+      brushState: 'p' // 选颜色时自动切换回画笔模式
     });
   },
   //画笔大小
