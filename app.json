@@ -8,5 +8,15 @@
     "navigationBarTitleText": "笔记画板",
     "navigationBarTextStyle": "black"
   },
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "__usePrivacyCheck__": true,
+  "requiredPrivateInfos": [
+    "chooseImage",
+    "saveImageToPhotosAlbum"
+  ],
+  "permission": {
+    "scope.writePhotosAlbum": {
+      "desc": "您的作品将保存到手机相册"
+    }
+  }
 }
