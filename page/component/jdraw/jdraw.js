@@ -307,6 +307,20 @@ Page({
       const currentObj = objects[objects.length - 1]; // 当前正在画的对象
 
       if (currentObj && currentObj.type === 'path') {
+        // --- 路径简化优化 ---
+        // 获取上一个点
+        const lastPoint = currentObj.points[currentObj.points.length - 1];
+        // 计算距离 (平方距即可，避免开方)
+        const dx = canvasPos.x - lastPoint.x;
+        const dy = canvasPos.y - lastPoint.y;
+        const distSq = dx * dx + dy * dy;
+
+        // 阈值：2px (即平方 4)。小于该距离则忽略，减少点数
+        if (distSq < 4) {
+          return;
+        }
+        // -------------------
+
         currentObj.points.push(canvasPos);
 
         // 更新包围盒
@@ -407,7 +421,23 @@ Page({
   },
 
   //重绘整个画布
-  redrawCanvas: function () {
+  redrawCanvas: function (isExport = false) {
+    // 导出模式下：使用全尺寸覆盖
+    // 正常模式下：使用当前视图变换(scale/translate)
+
+    let sc = this.data.scale;
+    let tx = this.data.translateX;
+    let ty = this.data.translateY;
+
+    if (isExport) {
+      // 导出时，强制缩放为 1（或根据需求调整）
+      sc = 1;
+      // 导出时，将画布原点对齐到内容边界的左上角
+      // 这样可以确保 minX/minY 处的内容被画在 canvas 的 (0,0) 处
+      tx = -this.data.canvasBounds.minX;
+      ty = -this.data.canvasBounds.minY;
+    }
+
     // 清空画布
     this.context.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
 
@@ -417,132 +447,189 @@ Page({
 
     // 应用变换
     this.context.save();
-    this.context.scale(this.data.scale, this.data.scale);
-    this.context.translate(this.data.translateX / this.data.scale, this.data.translateY / this.data.scale);
+    this.context.scale(sc, sc);
+    this.context.translate(tx / sc, ty / sc);
 
     // 重绘所有对象
     let objects = this.data.graphObjects;
-    for (let i = 0; i < objects.length; i++) {
-      const obj = objects[i];
 
-      if (obj.type === 'path') {
-        // 绘制路径
-        if (obj.points.length > 0) {
-          this.context.setStrokeStyle(obj.style.color);
-          this.context.setLineWidth(obj.style.width);
-          this.context.setLineCap('round'); // 统一设置
-          this.context.setLineJoin('round');
+    // --- 视口剔除 (Viewport Culling) ---
+    // 仅在非导出模式下启用
+    if (!isExport) {
+      // 计算当前屏幕可见的画布范围 (矩形)
+      const buffer = 100;
+      const vX = -this.data.translateX / this.data.scale - buffer;
+      const vY = -this.data.translateY / this.data.scale - buffer;
+      const vW = (this.data.screenWidth / this.data.scale) + (buffer * 2);
+      const vH = (this.data.screenHeight / this.data.scale) + (buffer * 2);
 
-          this.context.beginPath();
-          this.context.moveTo(obj.points[0].x + (obj.x || 0), obj.points[0].y + (obj.y || 0));
-          for (let j = 1; j < obj.points.length; j++) {
-            this.context.lineTo(obj.points[j].x + (obj.x || 0), obj.points[j].y + (obj.y || 0));
-          }
-          this.context.stroke();
+      for (let i = 0; i < objects.length; i++) {
+        const obj = objects[i];
+
+        // --- 视口碰撞检测 ---
+        const box = obj.itemBox;
+        const objMinX = box.minX + (obj.x || 0);
+        const objMaxX = box.maxX + (obj.x || 0);
+        const objMinY = box.minY + (obj.y || 0);
+        const objMaxY = box.maxY + (obj.y || 0);
+
+        if (objMinX > vX + vW || objMaxX < vX ||
+          objMinY > vY + vH || objMaxY < vY) {
+          continue; // 剔除！
         }
-      } else if (obj.type === 'image') {
-        // 绘制图片
-        this.context.drawImage(obj.src, obj.x, obj.y, obj.w, obj.h);
+
+        this.drawObject(obj); // 封装绘制逻辑以复用
       }
-
-      // 绘制选中框 (如果被选中)
-      if (this.data.activeObjectId === obj.id) {
-        this.context.setStrokeStyle('#1aad19'); // 微信绿
-        this.context.setLineWidth(2);
-        // 画个虚线框
-        // 小程序 canvas v1 context setLineDash 需要查文档，暂画实线
-
-        let box = obj.itemBox;
-        // 渲染选中框时，统一加上对象的当前位移/位置
-        // Image: box={0,w..}, offset=x. Total = x..x+w.
-        // Path: box={createX..}, offset=dx. Total = createX+dx..
-        const finalX = box.minX + (obj.x || 0);
-        const finalY = box.minY + (obj.y || 0);
-        const finalW = box.maxX - box.minX;
-        const finalH = box.maxY - box.minY;
-
-        this.context.strokeRect(finalX - 5, finalY - 5, finalW + 10, finalH + 10);
-
-        // 画控制点 (可选)
+    } else {
+      // 导出模式：不剔除，全量绘制
+      for (let i = 0; i < objects.length; i++) {
+        this.drawObject(objects[i]);
       }
     }
 
     this.context.restore();
     this.context.draw();
   },
-  //切换成画笔/橡皮檫
-  switchBrush: function (e) {
-    this.setData({
-      brushState: e.currentTarget.dataset.state
-    });
-  },
 
-  // 切换模式
-  switchMode: function (e) {
-    const mode = e.currentTarget.dataset.mode;
-    this.setData({
-      currentMode: mode,
-      activeObjectId: null // 切换模式时取消选中
-    });
-    this.redrawCanvas();
-  },
+  // 抽离单个对象绘制逻辑
+  drawObject: function (obj) {
+    if (obj.type === 'path') {
+      // 绘制路径
+      if (obj.points.length > 0) {
+        this.context.setStrokeStyle(obj.style.color);
+        this.context.setLineWidth(obj.style.width);
+        this.context.setLineCap('round');
+        this.context.setLineJoin('round');
 
-  // 选择图片
-  chooseImage: function () {
-    const that = this;
-    wx.chooseImage({
-      count: 1,
-      sourceType: ['album', 'camera'],
-      success: (res) => {
-        const tempFilePath = res.tempFilePaths[0];
-        wx.getImageInfo({
-          src: tempFilePath,
-          success: (info) => {
-            // 计算显示尺寸，默认限制宽度 200
-            const ratio = info.width / info.height;
-            const w = 200;
-            const h = 200 / ratio;
-
-            // 放在屏幕中心 (转画布坐标)
-            const cx = that.data.screenWidth / 2;
-            const cy = that.data.screenHeight / 2;
-            const canvasPos = that.screenToCanvas(cx, cy);
-
-            const newImg = {
-              id: 'img_' + Date.now(),
-              type: 'image',
-              src: tempFilePath,
-              x: canvasPos.x - w / 2,
-              y: canvasPos.y - h / 2,
-              w: w,
-              h: h,
-              // 包围盒
-              itemBox: {
-                minX: 0,
-                maxX: w,
-                minY: 0,
-                maxY: h
-              }
-            };
-
-            that.data.graphObjects.push(newImg);
-            // 扩展边界以包含图片
-            // 注意：expandCanvasBounds 需要绝对坐标
-            that.expandCanvasBounds(newImg.x, newImg.y);
-            that.expandCanvasBounds(newImg.x + w, newImg.y + h);
-
-            that.redrawCanvas();
-          }
-        })
+        this.context.beginPath();
+        this.context.moveTo(obj.points[0].x + (obj.x || 0), obj.points[0].y + (obj.y || 0));
+        for (let j = 1; j < obj.points.length; j++) {
+          this.context.lineTo(obj.points[j].x + (obj.x || 0), obj.points[j].y + (obj.y || 0));
+        }
+        this.context.stroke();
       }
-    })
+    } else if (obj.type === 'image') {
+      // 绘制图片
+      this.context.drawImage(obj.src, obj.x, obj.y, obj.w, obj.h);
+    }
+
+    // 绘制选中框 (如果被选中)
+    if (this.data.activeObjectId === obj.id) {
+      this.context.setStrokeStyle('#1aad19');
+      this.context.setLineWidth(2);
+
+      let box = obj.itemBox;
+      const finalX = box.minX + (obj.x || 0);
+      const finalY = box.minY + (obj.y || 0);
+      const finalW = box.maxX - box.minX;
+      const finalH = box.maxY - box.minY;
+
+      this.context.strokeRect(finalX - 5, finalY - 5, finalW + 10, finalH + 10);
+    }
   },
+
+  // 保存图片到相册
+  saveToAlbum: function () {
+    const that = this;
+    wx.showLoading({
+      title: '正在保存...',
+    });
+
+    // 1. 计算完整内容的宽高
+    const bounds = this.data.canvasBounds;
+    // 留一点边距 (padding)
+    const padding = 50;
+    const fullWidth = (bounds.maxX - bounds.minX) + padding * 2;
+    const fullHeight = (bounds.maxY - bounds.minY) + padding * 2;
+
+    // 记录原始画布尺寸 (通常是屏幕大小)
+    const originalWidth = this.data.screenWidth;
+
+    // 2. 临时调整画布尺寸以容纳所有内容
+    this.setData({
+      canvasWidth: fullWidth,
+      canvasHeight: fullHeight
+    }, () => {
+      // setData 回调，此时 canvas DOM 大小已变
+
+      // 3. 切换到导出模式 (全量绘制 + 重置视图)
+      that.redrawCanvas(true);
+
+      // 4. 等待绘制完成后导出
+      that.context.draw(true, () => {
+        wx.canvasToTempFilePath({
+          canvasId: 'palette',
+          fileType: 'png',
+          // 指定导出的区域为整个巨型画布
+          destWidth: fullWidth,
+          destHeight: fullHeight,
+          width: fullWidth,
+          height: fullHeight,
+          success: function (res) {
+            wx.saveImageToPhotosAlbum({
+              filePath: res.tempFilePath,
+              success: function () {
+                wx.hideLoading();
+                wx.showToast({
+                  title: '保存成功',
+                  icon: 'success',
+                  duration: 2000
+                });
+                // 5. 恢复正常视图和尺寸
+                that.restoreAfterSave(originalWidth);
+              },
+              fail: function (err) {
+                wx.hideLoading();
+                if (err.errMsg === 'saveImageToPhotosAlbum:fail auth deny') {
+                  wx.showModal({
+                    title: '保存失败',
+                    content: '需要您授权保存相册',
+                    showCancel: false,
+                    confirmText: '去设置',
+                    success: function () {
+                      wx.openSetting();
+                    }
+                  });
+                } else {
+                  wx.showToast({
+                    title: '保存失败',
+                    icon: 'none'
+                  });
+                }
+                that.restoreAfterSave(originalWidth);
+              }
+            });
+          },
+          fail: function (err) {
+            wx.hideLoading();
+            wx.showToast({
+              title: '导出失败',
+              icon: 'none'
+            });
+            that.restoreAfterSave(originalWidth);
+          }
+        }, that);
+      });
+    });
+  },
+
+  // 保存后的恢复逻辑
+  restoreAfterSave: function (originalWidth) {
+    this.setData({
+      canvasWidth: 800, // 这里简单重置回默认 800 或者上次记录的值
+      canvasHeight: 1000
+    }, () => {
+      this.redrawCanvas(false);
+    });
+  },
+
   //绘制回退
   drawBack: function () {
     if (this.data.graphObjects.length == 0) return false;
     this.data.graphObjects.pop();
     this.redrawCanvas();
   },
+
   //清空画布
   drawClear: function () {
     this.context.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
@@ -563,67 +650,6 @@ Page({
       scale: 1,
       translateX: 0,
       translateY: 0
-    });
-    // console.log(this.data.points);
-  },
-
-  // 保存图片到相册
-  saveToAlbum: function () {
-    const that = this;
-    wx.showLoading({
-      title: '正在保存...',
-    });
-
-    // 重新绘制一次以确保白底渲染完成，并在回调中保存
-    // 强制不透明：因为 redrawCanvas 第一步就是 fillRect 白色
-    this.redrawCanvas();
-
-    // 注意：redrawCanvas 里调用了 context.draw()。
-    // 为了稳妥，我们在这里手动再 draw 一次并利用回调
-    this.context.draw(true, () => {
-      wx.canvasToTempFilePath({
-        canvasId: 'palette',
-        fileType: 'png',
-        success: function (res) {
-          wx.saveImageToPhotosAlbum({
-            filePath: res.tempFilePath,
-            success: function () {
-              wx.hideLoading();
-              wx.showToast({
-                title: '保存成功',
-                icon: 'success',
-                duration: 2000
-              });
-            },
-            fail: function (err) {
-              wx.hideLoading();
-              if (err.errMsg === 'saveImageToPhotosAlbum:fail auth deny') {
-                wx.showModal({
-                  title: '提示',
-                  content: '需要您授权保存相册',
-                  showCancel: false,
-                  confirmText: '去设置',
-                  success: function () {
-                    wx.openSetting();
-                  }
-                });
-              } else {
-                wx.showToast({
-                  title: '保存失败',
-                  icon: 'none'
-                });
-              }
-            }
-          });
-        },
-        fail: function (err) {
-          wx.hideLoading();
-          wx.showToast({
-            title: '导出失败',
-            icon: 'none'
-          });
-        }
-      }, that);
     });
   },
   //更改画笔颜色
