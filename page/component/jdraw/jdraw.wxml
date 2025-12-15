@@ -1,9 +1,22 @@
 <view class='jdraw'>
   <view class='tool'>
-    <image class="{{brushState=='p'?'selected':''}}" src='/image/jd_pencil.png' data-state='p' bindtap='switchBrush'></image>
-    <image class="{{brushState=='c'?'selected':''}}" src='/image/jd_eraser.png' data-state='c' bindtap='switchBrush'></image>
-    <image src='/image/jd_clear.png' bindtap='drawClear'></image>
-    <image src='/image/jd_back.png' bindtap='drawBack'></image>
+    <!-- 模式切换 -->
+    <view class='icon-btn {{currentMode=="select"?"selected":""}}' data-mode='select' bindtap='switchMode'>👆</view>
+    <view class='icon-btn {{currentMode=="draw"?"selected":""}}' data-mode='draw' bindtap='switchMode'>✏️</view>
+    <view class="separator">|</view>
+    <!-- 绘图工具 -->
+    <block wx:if="{{currentMode == 'draw'}}">
+      <view class='icon-btn {{brushState=="p"?"selected":""}}' data-state='p' bindtap='switchBrush'>🖌️</view>
+      <view class='icon-btn {{brushState=="c"?"selected":""}}' data-state='c' bindtap='switchBrush'>🧽</view>
+    </block>
+    <view class='icon-btn' bindtap='chooseImage'>📷</view>
+    <view class='icon-btn' bindtap='drawClear'>🗑️</view>
+    <view class='icon-btn' bindtap='drawBack'>↶</view>
+    <view class='icon-btn' bindtap='saveToAlbum'>💾</view>
+    <view class='icon-btn help-btn' bindtap='showTutorialAgain'>
+      <text class='help-text-line'>使用</text>
+      <text class='help-text-line'>说明</text>
+    </view>
   </view>
   <view>
     <scroll-view scroll-x="true" scroll-left="0" class='tinct-list'>
@@ -15,5 +28,41 @@
       <slider value="{{tinctSize}}" min="1" max="10" bindchange="tinSizechange" show-value/>
     </view>
   </view>
-  <canvas style="width: 400px; height: 500px;" canvas-id="palette" bindtouchstart='touchstart' bindtouchmove='touchMove' bindtouchend='touchEnd' disable-scroll='true'></canvas>
+  <view class="canvas-container">
+    <canvas style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;" canvas-id="palette" bindtouchstart='touchstart' bindtouchmove='touchMove' bindtouchend='touchEnd' disable-scroll='true'></canvas>
+  </view>
+  
+  <!-- 使用说明弹窗 -->
+  <view class="tutorial-overlay {{showTutorial?'show':''}}" wx:if="{{showTutorial}}">
+    <view class="tutorial-modal">
+      <view class="tutorial-header">
+        <text class="tutorial-title">🎨 使用说明</text>
+      </view>
+      <view class="tutorial-content">
+        <view class="tutorial-item">
+          <text class="tutorial-icon">🖌️</text>
+          <text class="tutorial-text">单指绘画，选择颜色和笔刷大小进行创作</text>
+        </view>
+        <view class="tutorial-item">
+          <text class="tutorial-icon">👆</text>
+          <text class="tutorial-text">长按500ms后可拖拽移动画布</text>
+        </view>
+        <view class="tutorial-item">
+          <text class="tutorial-icon">👌</text>
+          <text class="tutorial-text">双指缩放画布，支持无限放大缩小</text>
+        </view>
+        <view class="tutorial-item">
+          <text class="tutorial-icon">📱</text>
+          <text class="tutorial-text">画布会根据绘画内容自动扩展</text>
+        </view>
+        <view class="tutorial-item">
+          <text class="tutorial-icon">💾</text>
+          <text class="tutorial-text">点击保存按钮可将作品保存到相册</text>
+        </view>
+      </view>
+      <view class="tutorial-footer">
+        <button class="tutorial-btn" bindtap="closeTutorial">开始创作</button>
+      </view>
+    </view>
+  </view>
 </view>

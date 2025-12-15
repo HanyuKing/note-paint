@@ -4,18 +4,25 @@
 
 .jdraw .tool {
   display: flex;
-  align-content: center;
-  justify-content: space-between;
-  margin: 0 15px;
+  align-items: center;
+  justify-content: space-around;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  margin: 10px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  gap: 8px;
 }
 
-.jdraw .tool image {
-  width: 30px;
-  height: 30px;
+.jdraw .separator {
+  color: rgba(255,255,255,0.5);
+  margin: 0 4px;
 }
 
 .jdraw .selected {
-  background-color: #f7efe0;
+  background-color: rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
 }
 
 .jdraw .tinct-list {
@@ -42,3 +49,179 @@
   margin-top: -2px;
   margin-left: -2px;
 }
+
+.jdraw .icon-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 3px;
+  background-color: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.jdraw .icon-btn:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.jdraw .icon-btn:active {
+  transform: translateY(-1px) scale(0.95);
+  background-color: rgba(255, 255, 255, 0.4);
+}
+
+.jdraw .help-btn {
+  background-color: rgba(255, 193, 7, 0.3) !important;
+  border: 1px solid rgba(255, 193, 7, 0.5);
+  flex-direction: column;
+}
+
+.jdraw .help-btn:hover {
+  background-color: rgba(255, 193, 7, 0.4) !important;
+}
+
+.jdraw .help-text-line {
+  font-size: 8px;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  line-height: 1;
+  display: block;
+}
+
+.jdraw .canvas-container {
+  overflow: hidden;
+  width: 100%;
+  height: calc(100vh - 180px);
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  margin: 5px 0 0 0;
+  position: relative;
+  background-color: #ffffff;
+}
+
+.jdraw .status-overlay {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 10px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.jdraw .status-text {
+  font-size: 10px;
+  color: white;
+  font-weight: normal;
+}
+
+/* 使用说明弹窗样式 */
+.jdraw .tutorial-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.jdraw .tutorial-overlay.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.jdraw .tutorial-modal {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20px;
+  padding: 30px;
+  margin: 20px;
+  max-width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  transform: scale(0.8);
+  transition: all 0.3s ease;
+}
+
+.jdraw .tutorial-overlay.show .tutorial-modal {
+  transform: scale(1);
+}
+
+.jdraw .tutorial-header {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.jdraw .tutorial-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.jdraw .tutorial-content {
+  margin-bottom: 25px;
+}
+
+.jdraw .tutorial-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 12px;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.jdraw .tutorial-icon {
+  font-size: 16px;
+  margin-right: 12px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.jdraw .tutorial-text {
+  font-size: 14px;
+  color: white;
+  line-height: 1.4;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.jdraw .tutorial-footer {
+  text-align: center;
+}
+
+.jdraw .tutorial-btn {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 25px;
+  font-size: 16px;
+  font-weight: bold;
+  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+  transition: all 0.3s ease;
+}
+
+.jdraw .tutorial-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
+}
+
