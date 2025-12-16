@@ -36,6 +36,11 @@
     <!-- 隐形画布用于导出，尺寸动态绑定 exportWidth/Height，移出屏幕外 -->
     <canvas style="width: {{exportWidth}}px; height: {{exportHeight}}px; position: fixed; left: 10000px; top: 0;" canvas-id="exportCanvas"></canvas>
 
+    <!-- 缩放比例提示 (醒目) -->
+    <cover-view class="zoom-toast" wx:if="{{showScaleToast}}">
+      <cover-view class="zoom-text">{{scalePercent}}%</cover-view>
+    </cover-view>
+
 
   </view>
   

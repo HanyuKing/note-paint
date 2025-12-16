@@ -312,14 +312,15 @@ Page({
       this.data.lastTouchDistance = currentDistance;
       this.data.lastPanPoint = { x: centerX, y: centerY };
 
-      // 显示缩放比例 (已隐藏)
-      // const newPercent = Math.round(newScale * 100);
-      // if (newPercent !== this.data.scalePercent) {
-      //   this.setData({
-      //     scalePercent: newPercent,
-      //     showScaleToast: true
-      //   });
-      // }
+      // 显示缩放比例 (Center Toast)
+      // 仅当百分比变化时才 setData，减少通信
+      const newPercent = Math.round(newScale * 100);
+      if (newPercent !== this.data.scalePercent) {
+        this.setData({
+          scalePercent: newPercent,
+          showScaleToast: true
+        });
+      }
 
       const now = Date.now();
       if (now - (this.lastRenderTime || 0) > 20) {
