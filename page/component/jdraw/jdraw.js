@@ -36,6 +36,7 @@ Page({
     // 使用说明弹窗
     showTutorial: false
   },
+
   onReady: function () {
     this.context = wx.createCanvasContext('palette');
     // 获取系统信息
@@ -707,5 +708,15 @@ Page({
   // 获取当前缩放比例百分比
   getScalePercent: function () {
     return Math.round(this.data.scale * 100);
+  },
+  // 广告事件监听
+  adLoad() {
+    console.log('原生模板广告加载成功')
+  },
+  adError(err) {
+    console.error('原生模板广告加载失败', err)
+  },
+  adClose() {
+    console.log('原生模板广告关闭')
   }
 })

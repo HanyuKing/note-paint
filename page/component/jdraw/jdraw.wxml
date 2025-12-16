@@ -44,6 +44,11 @@
 
   </view>
   
+  <!-- 底部广告位 (原生模板/自定义) -->
+  <view class="ad-container">
+    <ad-custom unit-id="adunit-cc4aafa8c129ec91" bindload="adLoad" binderror="adError" bindclose="adClose"></ad-custom>
+  </view>
+  
   <!-- 使用说明弹窗 (回归标准 View，通过隐藏 Canvas 解决层级问题) -->
   <view class="tutorial-overlay show" wx:if="{{showTutorial}}" bindtap="closeTutorial">
     <view class="tutorial-modal">
