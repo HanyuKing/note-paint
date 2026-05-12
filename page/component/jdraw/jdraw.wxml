@@ -45,7 +45,7 @@
   </view>
   
   <!-- 底部广告位 (原生模板/自定义) -->
-  <view class="ad-container">
+  <view class="ad-container" wx:if="{{showAd}}">
     <ad-custom unit-id="adunit-cc4aafa8c129ec91" bindload="adLoad" binderror="adError" bindclose="adClose"></ad-custom>
   </view>
   

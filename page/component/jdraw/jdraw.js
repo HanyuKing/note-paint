@@ -34,7 +34,10 @@ Page({
     },
 
     // 使用说明弹窗
-    showTutorial: false
+    showTutorial: false,
+    
+    // 广告显示控制
+    showAd: true
   },
 
   onReady: function () {
@@ -182,16 +185,16 @@ Page({
 
       } else {
         // 绘画模式 ... (unchanged)
-        let tinct, lineWidth;
+    let tinct, lineWidth;
         const currentBrushState = this.data.brushState || 'p';
         if (currentBrushState == 'p') {
           const colorList = this.data.tinctList || [];
           const colorIndex = this.data.tinctCurr || 0;
           tinct = colorList[colorIndex] || '#000000';
           lineWidth = this.data.tinctSize || 5;
-        } else {
-          tinct = "#ffffff";
-          lineWidth = 20;
+    } else {
+      tinct = "#ffffff";
+      lineWidth = 20;
           this.context.setLineCap('round');
           this.context.setLineJoin('round');
         }
@@ -717,6 +720,9 @@ Page({
     console.error('原生模板广告加载失败', err)
   },
   adClose() {
-    console.log('原生模板广告关闭')
+    console.log('原生模板广告关闭');
+    this.setData({
+      showAd: false
+    });
   }
 })

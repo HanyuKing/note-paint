@@ -1,5 +1,15 @@
+/* 确保整个页面是 flex 布局 */
+page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .jdraw {
   background-color: #fff;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .jdraw .tool {
@@ -98,13 +108,15 @@
 .jdraw .canvas-container {
   overflow: hidden;
   width: 100%;
-  flex: 1; /* Auto-fill remaining space */
+  flex: 1; /* 让画布占据剩余空间 */
   min-height: 0;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
   margin: 5px 0 0 0;
   position: relative;
   background-color: #ffffff;
+  /* 为底部广告留出空间 (预估高度，根据实际广告高度调整) */
+  margin-bottom: 100px; 
 }
 
 .jdraw .status-overlay {
@@ -249,15 +261,20 @@
   box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
 }
 
-/* 底部广告容器 */
+/* 底部广告容器 - 改为固定定位 */
 .ad-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
   width: 100%;
-  flex: 0 0 auto;
-  background-color: transparent;
+  background-color: rgba(255, 255, 255, 0.9); /* 半透明背景防止文字看不清 */
+  backdrop-filter: blur(10px);
   padding-bottom: constant(safe-area-inset-bottom);
   padding-bottom: env(safe-area-inset-bottom);
   display: flex;
   justify-content: center;
   align-items: center;
+  z-index: 1000; /* 确保在最上层 */
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
 }
 
