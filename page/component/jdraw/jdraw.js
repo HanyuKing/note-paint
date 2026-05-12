@@ -1,81 +1,206 @@
+const boardStore = require('../../../utils/boardStore');
+
 Page({
   data: {
-    // OLD: points: [],
-    graphObjects: [], // 新的数据核心：存储所有对象(Path, Image, etc)
-    currentMode: 'draw', // 'draw' | 'select'
-    activeObjectId: null, // 当前选中的对象ID
+    graphObjects: [],
+    currentMode: 'draw',
+    activeObjectId: null,
 
-    brushState: 'p', //'p'-画笔；'c'-橡皮檫
-    tinctList: ['#000000', '#362c23', '#715e4f', '#643d5c', '#677e3a', '#953c38', '#314d59', '#a7b47f', '#c58d8e', '#658e9f', '#229daf', '#7d790e', '#ebd669', '#2a1706', '#623919', '#ba8559', '#a33a65', '#fcac7b', '#fbe8c5', '#414141', '#828282', '#aaaaaa', '#dbdbdb', '#f7f7f7', '#ffcc59', '#cbcc57', '#e2513c', '#69b4d3', '#c72267', '#8dae21', '#1a386a', '#1f76bb', '#2fb7f5', '#a070bc', '#fb9e3f', '#ffd778'],
-    tinctCurr: 0, //当前画笔颜色
-    tinctSize: 5, //画笔尺寸
+    brushState: 'p',
+    tinctList: [
+      '#000000',
+      '#EF4444',
+      '#F97316',
+      '#F59E0B',
+      '#10B981',
+      '#3B82F6',
+      '#2563EB',
+      '#6366F1',
+      '#8B5CF6',
+      '#92400E',
+      '#9CA3AF',
+      '#FFFFFF'
+    ],
+    tinctCurr: 0,
+    tinctSize: 3,
 
-    // 画布变换相关
-    canvasWidth: 800, //画布初始宽度
-    canvasHeight: 1000, //画布初始高度
-    scale: 1, //缩放比例
-    translateX: 0, //X方向平移
-    translateY: 0, //Y方向平移
+    canvasWidth: 800,
+    canvasHeight: 1000,
+    scale: 1,
+    translateX: 0,
+    translateY: 0,
 
-    // 手势相关
-    isDrawing: false, //是否正在绘画
-    isPanning: false, //是否正在平移
-    isZooming: false, //是否正在缩放
-    longPressTimer: null, //长按定时器
-    lastTouchDistance: 0, //上次双指距离
-    lastPanPoint: null, //上次平移点
+    isDrawing: false,
+    isPanning: false,
+    isZooming: false,
+    lastTouchDistance: 0,
+    lastPanPoint: null,
 
-    // 画布边界（动态扩展）
-    canvasBounds: {
-      minX: 0,
-      maxX: 800,
-      minY: 0,
-      maxY: 1000
-    },
+    canvasBounds: { minX: 0, maxX: 800, minY: 0, maxY: 1000 },
 
-    // 使用说明弹窗
     showTutorial: false,
-    
-    // 广告显示控制
-    showAd: true
+    showScaleToast: false,
+    scalePercent: 100,
+
+    currentFileId: '',
+    fileName: '',
+    hasChanges: false,
+    isSavingBoard: false,
+
+    exportWidth: 0,
+    exportHeight: 0
   },
 
-  onReady: function () {
+  onLoad() {
+    this.consumePendingFileId(true);
+  },
+
+  onShow() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 0 });
+    }
+    this.consumePendingFileId(false);
+  },
+
+  onReady() {
     this.context = wx.createCanvasContext('palette');
-    // 获取系统信息
-    const systemInfo = wx.getSystemInfoSync();
+    const sysInfo = wx.getSystemInfoSync();
     this.setData({
-      screenWidth: systemInfo.windowWidth,
-      screenHeight: systemInfo.windowHeight
+      screenWidth: sysInfo.windowWidth,
+      screenHeight: sysInfo.windowHeight
     });
-
-    // 检查是否第一次使用
     this.checkFirstTimeUser();
+
+    if (this.data.graphObjects.length > 0) {
+      this.redrawCanvas();
+    }
   },
 
-  // 检查是否第一次使用
-  checkFirstTimeUser: function () {
+  // ---------- 文件加载 ----------
+
+  consumePendingFileId(isLoad) {
+    const app = getApp();
+    if (!app || !app.globalData) return;
+    const pending = app.globalData.pendingFileId;
+    if (!pending) return;
+
+    if (pending === '__reset__') {
+      app.globalData.pendingFileId = '';
+      this.applyEmptyBoard();
+      return;
+    }
+
+    if (pending === '__detach__') {
+      // 当前编辑的文件被删除：保留画板内容，仅解除文件绑定，等待用户再次保存生成新 ID
+      app.globalData.pendingFileId = '';
+      this.setData({
+        currentFileId: '',
+        fileName: '',
+        hasChanges: this.data.graphObjects.length > 0
+      });
+      return;
+    }
+
+    if (pending === this.data.currentFileId) {
+      app.globalData.pendingFileId = '';
+      return;
+    }
+
+    app.globalData.pendingFileId = '';
+
+    if (!isLoad && this.data.hasChanges) {
+      this.confirmDiscardAndLoad(pending);
+    } else {
+      this.loadBoardFile(pending);
+    }
+  },
+
+  confirmDiscardAndLoad(pendingId) {
+    wx.showModal({
+      title: '内容尚未保存',
+      content: '离开当前画板将丢失未保存的修改，是否继续？',
+      confirmText: '不保存',
+      cancelText: '取消',
+      success: res => {
+        if (res.confirm) {
+          this.loadBoardFile(pendingId);
+        }
+      }
+    });
+  },
+
+  loadBoardFile(fileId) {
+    const file = boardStore.getFile(fileId);
+    if (!file) {
+      wx.showToast({ title: '画板文件不存在', icon: 'none' });
+      return;
+    }
+    const data = file.data || {};
+    this.setData({
+      currentFileId: file.id,
+      fileName: file.name || '',
+      hasChanges: false,
+      graphObjects: data.graphObjects || [],
+      canvasBounds: data.canvasBounds || { minX: 0, maxX: 800, minY: 0, maxY: 1000 },
+      canvasWidth: data.canvasWidth || 800,
+      canvasHeight: data.canvasHeight || 1000,
+      scale: data.scale || 1,
+      translateX: data.translateX || 0,
+      translateY: data.translateY || 0,
+      brushState: data.brushState || 'p',
+      tinctCurr: typeof data.tinctCurr === 'number' ? data.tinctCurr : 0,
+      tinctSize: data.tinctSize || 3,
+      currentMode: data.currentMode || 'draw',
+      activeObjectId: null
+    }, () => {
+      const app = getApp();
+      if (app && app.globalData) app.globalData.currentEditingFileId = file.id;
+      if (this.context) this.redrawCanvas();
+    });
+  },
+
+  applyEmptyBoard() {
+    if (this.context) {
+      this.context.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
+      this.context.draw();
+    }
+    this.setData({
+      currentFileId: '',
+      fileName: '',
+      hasChanges: false,
+      graphObjects: [],
+      canvasBounds: { minX: 0, maxX: 800, minY: 0, maxY: 1000 },
+      canvasWidth: 800,
+      canvasHeight: 1000,
+      scale: 1,
+      translateX: 0,
+      translateY: 0,
+      activeObjectId: null
+    });
+    const app = getApp();
+    if (app && app.globalData) app.globalData.currentEditingFileId = '';
+  },
+
+  markChanged() {
+    if (!this.data.hasChanges) {
+      this.setData({ hasChanges: true });
+    }
+  },
+
+  // ---------- 首次使用 ----------
+
+  checkFirstTimeUser() {
     try {
-      const hasUsedBefore = wx.getStorageSync('hasUsedNotePaint');
-      if (!hasUsedBefore) {
-        // 第一次使用，显示使用说明
-        setTimeout(() => {
-          this.setData({
-            showTutorial: true
-          });
-        }, 500);
+      if (!wx.getStorageSync('hasUsedNotePaint')) {
+        setTimeout(() => this.setData({ showTutorial: true }), 500);
       }
     } catch (e) {
       console.error('检查首次使用状态失败:', e);
     }
   },
 
-  // 关闭使用说明弹窗
-  closeTutorial: function () {
-    this.setData({
-      showTutorial: false
-    });
-    // 标记已使用过
+  closeTutorial() {
+    this.setData({ showTutorial: false });
     try {
       wx.setStorageSync('hasUsedNotePaint', true);
     } catch (e) {
@@ -83,57 +208,31 @@ Page({
     }
   },
 
-  // 重新显示使用说明
-  showTutorialAgain: function () {
-    this.setData({
-      showTutorial: true
-    });
+  stopPropagation() {},
+
+  // ---------- 坐标 / 边界 ----------
+
+  screenToCanvas(screenX, screenY) {
+    return {
+      x: (screenX - this.data.translateX) / this.data.scale,
+      y: (screenY - this.data.translateY) / this.data.scale
+    };
   },
 
-  // 坐标转换：屏幕坐标转画布坐标
-  screenToCanvas: function (screenX, screenY) {
-    const canvasX = (screenX - this.data.translateX) / this.data.scale;
-    const canvasY = (screenY - this.data.translateY) / this.data.scale;
-    return { x: canvasX, y: canvasY };
-  },
-
-  // 画布坐标转屏幕坐标
-  canvasToScreen: function (canvasX, canvasY) {
-    const screenX = canvasX * this.data.scale + this.data.translateX;
-    const screenY = canvasY * this.data.scale + this.data.translateY;
-    return { x: screenX, y: screenY };
-  },
-
-  // 计算两点间距离
-  getDistance: function (touch1, touch2) {
-    const dx = touch1.x - touch2.x;
-    const dy = touch1.y - touch2.y;
+  getDistance(t1, t2) {
+    const dx = t1.x - t2.x;
+    const dy = t1.y - t2.y;
     return Math.sqrt(dx * dx + dy * dy);
   },
 
-  // 扩展画布边界
-  expandCanvasBounds: function (x, y) {
-    let bounds = this.data.canvasBounds;
+  expandCanvasBounds(x, y) {
+    const bounds = this.data.canvasBounds;
     let needUpdate = false;
     const padding = 50;
-
-    if (x < bounds.minX) {
-      bounds.minX = Math.floor(x - padding);
-      needUpdate = true;
-    }
-    if (x > bounds.maxX) {
-      bounds.maxX = Math.ceil(x + padding);
-      needUpdate = true;
-    }
-    if (y < bounds.minY) {
-      bounds.minY = Math.floor(y - padding);
-      needUpdate = true;
-    }
-    if (y > bounds.maxY) {
-      bounds.maxY = Math.ceil(y + padding);
-      needUpdate = true;
-    }
-
+    if (x < bounds.minX) { bounds.minX = Math.floor(x - padding); needUpdate = true; }
+    if (x > bounds.maxX) { bounds.maxX = Math.ceil(x + padding); needUpdate = true; }
+    if (y < bounds.minY) { bounds.minY = Math.floor(y - padding); needUpdate = true; }
+    if (y > bounds.maxY) { bounds.maxY = Math.ceil(y + padding); needUpdate = true; }
     if (needUpdate) {
       this.setData({
         canvasBounds: bounds,
@@ -142,26 +241,22 @@ Page({
       });
     }
   },
-  touchstart: function (e) {
+
+  // ---------- 触摸事件 ----------
+
+  touchstart(e) {
     const touches = e.touches;
-
     if (touches.length === 1) {
-      // 单指触摸
       const touch = touches[0];
-
-      // 根据模式判断行为
       if (this.data.currentMode === 'select') {
         const canvasPos = this.screenToCanvas(touch.x, touch.y);
-        // 倒序遍历（优先选中上层）
         let found = false;
         const objects = this.data.graphObjects;
         for (let i = objects.length - 1; i >= 0; i--) {
           const obj = objects[i];
           const box = obj.itemBox;
-          // 简单的矩形碰撞检测
           if (canvasPos.x >= box.minX + (obj.x || 0) && canvasPos.x <= box.maxX + (obj.x || 0) &&
-            canvasPos.y >= box.minY + (obj.y || 0) && canvasPos.y <= box.maxY + (obj.y || 0)) {
-
+              canvasPos.y >= box.minY + (obj.y || 0) && canvasPos.y <= box.maxY + (obj.y || 0)) {
             this.setData({
               activeObjectId: obj.id,
               isDraggingObject: true,
@@ -171,9 +266,7 @@ Page({
             break;
           }
         }
-
         if (!found) {
-          // 点击空白处：取消选中 + 开启平移
           this.setData({
             activeObjectId: null,
             isDraggingObject: false,
@@ -182,56 +275,44 @@ Page({
           });
         }
         this.redrawCanvas();
-
-      } else {
-        // 绘画模式 ... (unchanged)
-    let tinct, lineWidth;
-        const currentBrushState = this.data.brushState || 'p';
-        if (currentBrushState == 'p') {
-          const colorList = this.data.tinctList || [];
-          const colorIndex = this.data.tinctCurr || 0;
-          tinct = colorList[colorIndex] || '#000000';
-          lineWidth = this.data.tinctSize || 5;
-    } else {
-      tinct = "#ffffff";
-      lineWidth = 20;
-          this.context.setLineCap('round');
-          this.context.setLineJoin('round');
-        }
-
-        this.context.setStrokeStyle(tinct);
-        this.context.setLineWidth(lineWidth);
-
-        const canvasPos = this.screenToCanvas(touch.x, touch.y);
-        this.expandCanvasBounds(canvasPos.x, canvasPos.y);
-
-        this.setData({
-          isDrawing: true
-        });
-
-        const newPathObject = {
-          id: 'path_' + Date.now(),
-          type: 'path',
-          x: 0, y: 0,
-          points: [canvasPos],
-          style: {
-            color: tinct,
-            width: lineWidth
-          },
-          itemBox: {
-            minX: canvasPos.x, maxX: canvasPos.x,
-            minY: canvasPos.y, maxY: canvasPos.y
-          }
-        };
-
-        this.data.graphObjects.push(newPathObject);
+        return;
       }
 
+      let tinct, lineWidth;
+      const brushState = this.data.brushState || 'p';
+      if (brushState === 'p') {
+        const colors = this.data.tinctList || [];
+        tinct = colors[this.data.tinctCurr || 0] || '#000000';
+        lineWidth = this.data.tinctSize || 3;
+      } else {
+        tinct = '#ffffff';
+        lineWidth = 20;
+      }
+
+      this.context.setStrokeStyle(tinct);
+      this.context.setLineWidth(lineWidth);
+      this.context.setLineCap('round');
+      this.context.setLineJoin('round');
+
+      const canvasPos = this.screenToCanvas(touch.x, touch.y);
+      this.expandCanvasBounds(canvasPos.x, canvasPos.y);
+      this.setData({ isDrawing: true });
+
+      const newPath = {
+        id: 'path_' + Date.now(),
+        type: 'path',
+        x: 0, y: 0,
+        points: [canvasPos],
+        style: { color: tinct, width: lineWidth },
+        itemBox: {
+          minX: canvasPos.x, maxX: canvasPos.x,
+          minY: canvasPos.y, maxY: canvasPos.y
+        }
+      };
+      this.data.graphObjects.push(newPath);
     } else if (touches.length === 2) {
-      // ... (unchanged)
       const centerX = (touches[0].x + touches[1].x) / 2;
       const centerY = (touches[0].y + touches[1].y) / 2;
-
       this.setData({
         isDrawing: false,
         isZooming: true,
@@ -240,122 +321,86 @@ Page({
       });
     }
   },
-  touchMove: function (e) {
-    const touches = e.touches;
 
-    // ... (unchanged object dragging)
+  touchMove(e) {
+    const touches = e.touches;
     if (this.data.currentMode === 'select' && this.data.isDraggingObject && touches.length === 1 && this.data.activeObjectId) {
       const touch = touches[0];
-      const dx_screen = touch.x - this.data.lastDragPoint.x;
-      const dy_screen = touch.y - this.data.lastDragPoint.y;
-
-      const dx_canvas = dx_screen / this.data.scale;
-      const dy_canvas = dy_screen / this.data.scale;
-
-      const objects = this.data.graphObjects;
-      const obj = objects.find(o => o.id === this.data.activeObjectId);
-
+      const dxs = touch.x - this.data.lastDragPoint.x;
+      const dys = touch.y - this.data.lastDragPoint.y;
+      const dxc = dxs / this.data.scale;
+      const dyc = dys / this.data.scale;
+      const obj = this.data.graphObjects.find(o => o.id === this.data.activeObjectId);
       if (obj) {
-        obj.x = (obj.x || 0) + dx_canvas;
-        obj.y = (obj.y || 0) + dy_canvas;
-        this.setData({
-          lastDragPoint: { x: touch.x, y: touch.y }
-        });
+        obj.x = (obj.x || 0) + dxc;
+        obj.y = (obj.y || 0) + dyc;
+        this.setData({ lastDragPoint: { x: touch.x, y: touch.y } });
         this.redrawCanvas();
       }
       return;
     }
 
     if (this.data.isDrawing && touches.length === 1) {
-      // ... (unchanged drawing)
       const touch = touches[0];
       const canvasPos = this.screenToCanvas(touch.x, touch.y);
       this.expandCanvasBounds(canvasPos.x, canvasPos.y);
       const objects = this.data.graphObjects;
-      const currentObj = objects[objects.length - 1];
-
-      if (currentObj && currentObj.type === 'path') {
-        const lastPoint = currentObj.points[currentObj.points.length - 1];
-        const dx = canvasPos.x - lastPoint.x;
-        const dy = canvasPos.y - lastPoint.y;
-        const distSq = dx * dx + dy * dy;
-        if (distSq < 4) return;
-
-        currentObj.points.push(canvasPos);
-        currentObj.itemBox.minX = Math.min(currentObj.itemBox.minX, canvasPos.x);
-        currentObj.itemBox.maxX = Math.max(currentObj.itemBox.maxX, canvasPos.x);
-        currentObj.itemBox.minY = Math.min(currentObj.itemBox.minY, canvasPos.y);
-        currentObj.itemBox.maxY = Math.max(currentObj.itemBox.maxY, canvasPos.y);
-
-        this.bindDraw(currentObj.points);
+      const cur = objects[objects.length - 1];
+      if (cur && cur.type === 'path') {
+        const last = cur.points[cur.points.length - 1];
+        const dx = canvasPos.x - last.x;
+        const dy = canvasPos.y - last.y;
+        if (dx * dx + dy * dy < 4) return;
+        cur.points.push(canvasPos);
+        cur.itemBox.minX = Math.min(cur.itemBox.minX, canvasPos.x);
+        cur.itemBox.maxX = Math.max(cur.itemBox.maxX, canvasPos.x);
+        cur.itemBox.minY = Math.min(cur.itemBox.minY, canvasPos.y);
+        cur.itemBox.maxY = Math.max(cur.itemBox.maxY, canvasPos.y);
+        this.bindDraw(cur.points);
       }
-
     } else if (this.data.isZooming && touches.length === 2) {
-      // ... (unchanged zooming)
       const currentDistance = this.getDistance(touches[0], touches[1]);
       const scaleChange = currentDistance / this.data.lastTouchDistance;
-      let newScale = this.data.scale * scaleChange;
-      newScale = Math.max(0.05, newScale);
-
+      let newScale = Math.max(0.05, this.data.scale * scaleChange);
       const centerX = (touches[0].x + touches[1].x) / 2;
       const centerY = (touches[0].y + touches[1].y) / 2;
-
       const moveX = centerX - this.data.lastPanPoint.x;
       const moveY = centerY - this.data.lastPanPoint.y;
-
-      let newTranslateX = centerX - (centerX - this.data.translateX) * (newScale / this.data.scale);
-      let newTranslateY = centerY - (centerY - this.data.translateY) * (newScale / this.data.scale);
-
-      newTranslateX += moveX;
-      newTranslateY += moveY;
-
-      // 性能优化：直接修改 data 而不是 setData
+      let newTx = centerX - (centerX - this.data.translateX) * (newScale / this.data.scale);
+      let newTy = centerY - (centerY - this.data.translateY) * (newScale / this.data.scale);
+      newTx += moveX;
+      newTy += moveY;
       this.data.scale = newScale;
-      this.data.translateX = newTranslateX;
-      this.data.translateY = newTranslateY;
+      this.data.translateX = newTx;
+      this.data.translateY = newTy;
       this.data.lastTouchDistance = currentDistance;
       this.data.lastPanPoint = { x: centerX, y: centerY };
-
-      // 显示缩放比例 (Center Toast)
-      // 仅当百分比变化时才 setData，减少通信
       const newPercent = Math.round(newScale * 100);
       if (newPercent !== this.data.scalePercent) {
-        this.setData({
-          scalePercent: newPercent,
-          showScaleToast: true
-        });
+        this.setData({ scalePercent: newPercent, showScaleToast: true });
       }
-
       const now = Date.now();
       if (now - (this.lastRenderTime || 0) > 20) {
-        this.redrawCanvas(true); // Enable LOD
+        this.redrawCanvas();
         this.lastRenderTime = now;
       }
-
     } else if (this.data.isPanning && touches.length === 1) {
-      // 平移模式
       const touch = touches[0];
       if (this.data.lastPanPoint) {
-        const deltaX = touch.x - this.data.lastPanPoint.x;
-        const deltaY = touch.y - this.data.lastPanPoint.y;
-
+        const dX = touch.x - this.data.lastPanPoint.x;
+        const dY = touch.y - this.data.lastPanPoint.y;
         this.setData({
-          translateX: this.data.translateX + deltaX,
-          translateY: this.data.translateY + deltaY,
+          translateX: this.data.translateX + dX,
+          translateY: this.data.translateY + dY,
           lastPanPoint: { x: touch.x, y: touch.y }
         });
-
         this.redrawCanvas();
       }
     }
   },
-  touchEnd: function (e) {
-    if (this.data.longPressTimer) {
-      clearTimeout(this.data.longPressTimer);
-      this.data.longPressTimer = null;
-    }
 
-    // 重置手势状态
+  touchEnd() {
+    const changed = this.data.isDrawing || this.data.isDraggingObject;
     this.setData({
       isDrawing: false,
       isPanning: false,
@@ -363,53 +408,44 @@ Page({
       isDraggingObject: false,
       lastPanPoint: null,
       lastTouchDistance: 0,
-      showScaleToast: false // 隐藏缩放提示
+      showScaleToast: false
     });
+    if (changed) this.markChanged();
   },
-  //绘制单条线
-  bindDraw: function (point) {
-    if (point.length < 1) return;
 
+  // ---------- 绘制 ----------
+
+  bindDraw(points) {
+    if (!points || points.length < 1) return;
     this.context.save();
     this.context.scale(this.data.scale, this.data.scale);
     this.context.translate(this.data.translateX / this.data.scale, this.data.translateY / this.data.scale);
-
-    this.context.moveTo(point[0].x, point[0].y);
-    for (var i = 1; i < point.length; i++) {
-      this.context.lineTo(point[i].x, point[i].y);
+    this.context.beginPath();
+    this.context.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      this.context.lineTo(points[i].x, points[i].y);
     }
     this.context.stroke();
-
     this.context.restore();
     this.context.draw(true);
   },
 
-  // 核心渲染逻辑 (支持渲染到不同 Context)
-  renderToContext: function (ctx, width, height, scale, tx, ty, isExport) {
-    // 清空画布
+  renderToContext(ctx, width, height, scale, tx, ty, isExport) {
     ctx.clearRect(0, 0, width, height);
-
-    // 填充白色背景
-    ctx.setFillStyle('#ffffff');
-    ctx.fillRect(0, 0, width, height);
-
-    // 应用变换
+    if (isExport) {
+      ctx.setFillStyle('#ffffff');
+      ctx.fillRect(0, 0, width, height);
+    }
     ctx.save();
     ctx.scale(scale, scale);
     ctx.translate(tx / scale, ty / scale);
-
-    // 重绘所有对象
-    let objects = this.data.graphObjects;
-
-    // --- 视口剔除 (Viewport Culling) ---
+    const objects = this.data.graphObjects;
     if (!isExport) {
-      // 计算当前屏幕可见范围
       const buffer = 100;
       const vX = -tx / scale - buffer;
       const vY = -ty / scale - buffer;
-      const vW = (width / scale) + (buffer * 2);
-      const vH = (height / scale) + (buffer * 2);
-
+      const vW = (width / scale) + buffer * 2;
+      const vH = (height / scale) + buffer * 2;
       for (let i = 0; i < objects.length; i++) {
         const obj = objects[i];
         const box = obj.itemBox;
@@ -417,27 +453,18 @@ Page({
         const objMaxX = box.maxX + (obj.x || 0);
         const objMinY = box.minY + (obj.y || 0);
         const objMaxY = box.maxY + (obj.y || 0);
-
-        if (objMinX > vX + vW || objMaxX < vX ||
-          objMinY > vY + vH || objMaxY < vY) {
-          continue;
-        }
-
-        this.drawObject(ctx, obj);
+        if (objMinX > vX + vW || objMaxX < vX || objMinY > vY + vH || objMaxY < vY) continue;
+        this.drawObject(ctx, obj, false);
       }
     } else {
-      // 导出模式：全量绘制
       for (let i = 0; i < objects.length; i++) {
-        this.drawObject(ctx, objects[i]);
+        this.drawObject(ctx, objects[i], true);
       }
     }
-
     ctx.restore();
-    // ctx.draw() 由调用方决定是否有回调
   },
 
-  // 重绘主画布
-  redrawCanvas: function () {
+  redrawCanvas() {
     this.renderToContext(
       this.context,
       this.data.canvasWidth,
@@ -445,20 +472,18 @@ Page({
       this.data.scale,
       this.data.translateX,
       this.data.translateY,
-      false // isExport
+      false
     );
-    this.context.draw(); // Call draw for the main canvas
+    this.context.draw();
   },
 
-  // 抽离单个对象绘制逻辑
-  drawObject: function (ctx, obj) {
+  drawObject(ctx, obj, hideSelection) {
     if (obj.type === 'path') {
       if (obj.points.length > 0) {
         ctx.setStrokeStyle(obj.style.color);
         ctx.setLineWidth(obj.style.width);
         ctx.setLineCap('round');
         ctx.setLineJoin('round');
-
         ctx.beginPath();
         ctx.moveTo(obj.points[0].x + (obj.x || 0), obj.points[0].y + (obj.y || 0));
         for (let j = 1; j < obj.points.length; j++) {
@@ -470,259 +495,228 @@ Page({
       ctx.drawImage(obj.src, obj.x, obj.y, obj.w, obj.h);
     }
 
-    // 绘制选中框 (主画布且此时不是导出时，或者导出也想绘制选中框？一般导出不画选中框)
-    // 注意：这里 activeObjectId 通常只在 UI 交互中有意义
-    // 如果需要在导出时隐藏选中框，可增加参数控制。这里暂保持一致。
-    if (this.data.activeObjectId === obj.id) {
-      ctx.setStrokeStyle('#1aad19');
+    if (!hideSelection && this.data.activeObjectId === obj.id) {
+      ctx.setStrokeStyle('#2563EB');
       ctx.setLineWidth(2);
-
-      let box = obj.itemBox;
+      const box = obj.itemBox;
       const finalX = box.minX + (obj.x || 0);
       const finalY = box.minY + (obj.y || 0);
       const finalW = box.maxX - box.minX;
       const finalH = box.maxY - box.minY;
-
       ctx.strokeRect(finalX - 5, finalY - 5, finalW + 10, finalH + 10);
     }
   },
 
-  // 保存图片到相册 (离屏渲染方案)
-  saveToAlbum: function () {
-    const that = this;
-    wx.showLoading({
-      title: '正在保存...',
-    });
+  // ---------- 工具栏 ----------
 
-    // 1. 计算完整内容的宽高
-    const bounds = this.data.canvasBounds;
-    const padding = 50;
-    const fullWidth = (bounds.maxX - bounds.minX) + padding * 2;
-    const fullHeight = (bounds.maxY - bounds.minY) + padding * 2;
-
-    // 2. 设置离屏画布尺寸
+  switchMode(e) {
     this.setData({
-      exportWidth: fullWidth,
-      exportHeight: fullHeight
-    }, () => {
-      // 3. 创建离屏画布上下文
-      const exportCtx = wx.createCanvasContext('exportCanvas', that);
-
-      // 4. 计算对齐参数 (Scale=1, Translate以左上角为原点)
-      const tx = -bounds.minX + padding;
-      const ty = -bounds.minY + padding; // 加上 padding 居中一点
-
-      // 5. 渲染到离屏画布
-      // 这里不调用 redrawCanvas，而是调用核心渲染方法
-      that.renderToContext(
-        exportCtx,
-        fullWidth,
-        fullHeight,
-        1, // scale
-        tx, ty, // translate
-        true // isExport
-      );
-
-      // 6. 导出
-      // 在 renderToContext 后，我们需要一次带回调的 draw 此时才能确保离屏渲染完成
-      exportCtx.draw(true, () => {
-        wx.canvasToTempFilePath({
-          canvasId: 'exportCanvas',
-          fileType: 'png',
-          destWidth: fullWidth,
-          destHeight: fullHeight,
-          width: fullWidth,
-          height: fullHeight,
-          success: function (res) {
-            wx.saveImageToPhotosAlbum({
-              filePath: res.tempFilePath,
-              success: function () {
-                wx.hideLoading();
-                wx.showToast({ title: '保存成功', icon: 'success' });
-              },
-              fail: function (err) {
-                wx.hideLoading();
-                // 兼容不同机型的权限拒绝报错
-                if (err.errMsg.indexOf('auth') > -1 || err.errMsg.indexOf('deny') > -1) {
-                  wx.showModal({
-                    title: '保存失败',
-                    content: '请授权保存相册，以便将作品保存到您的手机',
-                    showCancel: false,
-                    confirmText: '去授权',
-                    success: function (res) {
-                      if (res.confirm) {
-                        wx.openSetting();
-                      }
-                    }
-                  });
-                } else {
-                  wx.showToast({ title: '保存失败: ' + err.errMsg, icon: 'none' });
-                }
-              }
-            });
-          },
-          fail: function () {
-            wx.hideLoading();
-            wx.showToast({ title: '导出失败', icon: 'none' });
-          }
-        }, that);
-      });
+      currentMode: e.currentTarget.dataset.mode,
+      activeObjectId: null
     });
-  },
-
-  // 保存后的恢复逻辑 (不再需要，因为主画布未被修改)
-  restoreAfterSave: function (originalWidth) {
-    // This function is no longer needed as the main canvas state is not altered during export.
-    // The main canvas will retain its current view and dimensions.
-  },
-
-  //绘制回退
-  drawBack: function () {
-    if (this.data.graphObjects.length == 0) return false;
-    this.data.graphObjects.pop();
     this.redrawCanvas();
   },
 
-  //清空画布
-  drawClear: function () {
-    this.context.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
-    this.context.draw();
-    this.setData({
-      graphObjects: [], // Clear objects
-      points: [], // Clear legacy (if any)
-      // 重置画布边界
-      canvasBounds: {
-        minX: 0,
-        maxX: 800,
-        minY: 0,
-        maxY: 1000
-      },
-      canvasWidth: 800,
-      canvasHeight: 1000,
-      // 重置视图变换
-      scale: 1,
-      translateX: 0,
-      translateY: 0
-    });
-  },
-  // 切换画笔/橡皮檫 (并自动进入绘画模式)
-  switchBrush: function (e) {
+  switchBrush(e) {
     this.setData({
       currentMode: 'draw',
       brushState: e.currentTarget.dataset.state
     });
   },
 
-  // 切换模式
-  switchMode: function (e) {
-    const mode = e.currentTarget.dataset.mode;
+  tinColorChange(e) {
     this.setData({
-      currentMode: mode,
-      activeObjectId: null // 切换模式时取消选中
+      tinctCurr: e.currentTarget.dataset.index,
+      brushState: 'p',
+      currentMode: 'draw'
     });
+  },
+
+  tinSizechange(e) {
+    this.setData({ tinctSize: e.detail.value });
+  },
+
+  adjustSize(e) {
+    const delta = Number(e.currentTarget.dataset.delta) || 0;
+    let next = (this.data.tinctSize || 3) + delta;
+    if (next < 1) next = 1;
+    if (next > 10) next = 10;
+    this.setData({ tinctSize: next });
+  },
+
+  drawBack() {
+    if (this.data.graphObjects.length === 0) return;
+    this.data.graphObjects.pop();
+    this.setData({ activeObjectId: null });
     this.redrawCanvas();
+    this.markChanged();
   },
 
-  // 选择图片
-  chooseImage: function () {
-    const that = this;
-    wx.chooseImage({
-      count: 1,
-      sourceType: ['album', 'camera'],
-      success: (res) => {
-        const tempFilePath = res.tempFilePaths[0];
-        wx.getImageInfo({
-          src: tempFilePath,
-          success: (info) => {
-            // 计算显示尺寸，默认限制宽度 200
-            const ratio = info.width / info.height;
-            const w = 200;
-            const h = 200 / ratio;
-
-            // 放在屏幕中心 (转画布坐标)
-            const cx = that.data.screenWidth / 2;
-            const cy = that.data.screenHeight / 2;
-            const canvasPos = that.screenToCanvas(cx, cy);
-
-            const newImg = {
-              id: 'img_' + Date.now(),
-              type: 'image',
-              src: tempFilePath,
-              x: canvasPos.x - w / 2,
-              y: canvasPos.y - h / 2,
-              w: w,
-              h: h,
-              // 包围盒
-              itemBox: {
-                minX: 0,
-                maxX: w,
-                minY: 0,
-                maxY: h
-              }
-            };
-
-            that.data.graphObjects.push(newImg);
-            // 扩展边界以包含图片
-            // 注意：expandCanvasBounds 需要绝对坐标
-            that.expandCanvasBounds(newImg.x, newImg.y);
-            that.expandCanvasBounds(newImg.x + w, newImg.y + h);
-
-            that.redrawCanvas();
-          }
-        })
+  drawClear() {
+    if (this.data.graphObjects.length === 0) return;
+    wx.showModal({
+      title: '清空画布？',
+      content: '清空后当前画布内容将被移除，是否继续？',
+      confirmText: '清空',
+      confirmColor: '#EF4444',
+      success: res => {
+        if (res.confirm) this.doClearCanvas();
       }
-    })
-  },
-
-  // 显示/关闭教程
-  showTutorialAgain: function () {
-    this.setData({ showTutorial: true });
-  },
-  closeTutorial: function () {
-    this.setData({ showTutorial: false });
-  },
-
-  //更改画笔颜色
-  tinColorChange: function (e) {
-    const index = e.currentTarget.dataset.index;
-    this.setData({
-      tinctCurr: index,
-      brushState: 'p' // 选颜色时自动切换回画笔模式
     });
   },
-  //画笔大小
-  tinSizechange: function (e) {
-    this.setData({
-      tinctSize: e.detail.value
-    });
-    // console.log(this.data.tinctSize);
-  },
 
-  // 重置视图
-  resetView: function () {
+  doClearCanvas() {
+    this.context.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
+    this.context.draw();
     this.setData({
+      graphObjects: [],
+      activeObjectId: null,
+      canvasBounds: { minX: 0, maxX: 800, minY: 0, maxY: 1000 },
+      canvasWidth: 800,
+      canvasHeight: 1000,
       scale: 1,
       translateX: 0,
       translateY: 0
     });
-    this.redrawCanvas();
+    this.markChanged();
   },
 
-  // 获取当前缩放比例百分比
-  getScalePercent: function () {
-    return Math.round(this.data.scale * 100);
+  chooseImage() {
+    const that = this;
+    wx.chooseImage({
+      count: 1,
+      sourceType: ['album', 'camera'],
+      success: res => {
+        const tempFilePath = res.tempFilePaths[0];
+        wx.getImageInfo({
+          src: tempFilePath,
+          success: info => {
+            that.persistTempFile(tempFilePath, savedPath => {
+              const ratio = info.width / info.height;
+              const w = 200;
+              const h = 200 / (ratio || 1);
+              const cx = that.data.screenWidth / 2;
+              const cy = that.data.screenHeight / 2;
+              const canvasPos = that.screenToCanvas(cx, cy);
+              const newImg = {
+                id: 'img_' + Date.now(),
+                type: 'image',
+                src: savedPath || tempFilePath,
+                x: canvasPos.x - w / 2,
+                y: canvasPos.y - h / 2,
+                w: w,
+                h: h,
+                itemBox: { minX: 0, maxX: w, minY: 0, maxY: h }
+              };
+              that.data.graphObjects.push(newImg);
+              that.expandCanvasBounds(newImg.x, newImg.y);
+              that.expandCanvasBounds(newImg.x + w, newImg.y + h);
+              that.redrawCanvas();
+              that.markChanged();
+            });
+          }
+        });
+      }
+    });
   },
-  // 广告事件监听
-  adLoad() {
-    console.log('原生模板广告加载成功')
+
+  persistTempFile(tempFilePath, callback) {
+    if (!tempFilePath || !wx.saveFile) {
+      callback(tempFilePath || '');
+      return;
+    }
+    wx.saveFile({
+      tempFilePath,
+      success: res => callback(res.savedFilePath || tempFilePath),
+      fail: () => callback(tempFilePath)
+    });
   },
-  adError(err) {
-    console.error('原生模板广告加载失败', err)
+
+  // ---------- 保存 ----------
+
+  saveBoard() {
+    if (this.data.isSavingBoard) return;
+    if (this.data.graphObjects.length === 0 && !this.data.currentFileId) {
+      wx.showToast({ title: '画板为空，无需保存', icon: 'none' });
+      return;
+    }
+    if (!boardStore.canCreateFile(this.data.currentFileId)) {
+      wx.showToast({ title: '开通会员后可保存更多文件', icon: 'none' });
+      return;
+    }
+
+    this.setData({ isSavingBoard: true });
+    wx.showLoading({ title: '正在保存...', mask: true });
+
+    this.generateThumbnail(thumbnail => {
+      const result = boardStore.saveFile({
+        id: this.data.currentFileId,
+        name: this.data.fileName,
+        thumbnail,
+        data: this.buildBoardData()
+      });
+      wx.hideLoading();
+      this.setData({ isSavingBoard: false });
+      if (!result.ok) {
+        wx.showToast({ title: result.message || '保存失败，请稍后重试', icon: 'none' });
+        return;
+      }
+      const app = getApp();
+      if (app && app.globalData) app.globalData.currentEditingFileId = result.file.id;
+      this.setData({
+        currentFileId: result.file.id,
+        fileName: result.file.name,
+        hasChanges: false
+      });
+      wx.showToast({ title: '保存成功', icon: 'success' });
+    });
   },
-  adClose() {
-    console.log('原生模板广告关闭');
-    this.setData({
-      showAd: false
+
+  buildBoardData() {
+    return {
+      graphObjects: this.data.graphObjects,
+      canvasBounds: this.data.canvasBounds,
+      canvasWidth: this.data.canvasWidth,
+      canvasHeight: this.data.canvasHeight,
+      scale: this.data.scale,
+      translateX: this.data.translateX,
+      translateY: this.data.translateY,
+      brushState: this.data.brushState,
+      tinctCurr: this.data.tinctCurr,
+      tinctSize: this.data.tinctSize,
+      currentMode: this.data.currentMode
+    };
+  },
+
+  generateThumbnail(callback) {
+    const bounds = this.data.canvasBounds;
+    const contentWidth = Math.max(bounds.maxX - bounds.minX, 1);
+    const contentHeight = Math.max(bounds.maxY - bounds.minY, 1);
+    const thumbSize = 240;
+    const padding = 16;
+    const scale = Math.min(
+      (thumbSize - padding * 2) / contentWidth,
+      (thumbSize - padding * 2) / contentHeight
+    );
+    const tx = padding - bounds.minX * scale + (thumbSize - padding * 2 - contentWidth * scale) / 2;
+    const ty = padding - bounds.minY * scale + (thumbSize - padding * 2 - contentHeight * scale) / 2;
+
+    this.setData({ exportWidth: thumbSize, exportHeight: thumbSize }, () => {
+      const exportCtx = wx.createCanvasContext('exportCanvas', this);
+      this.renderToContext(exportCtx, thumbSize, thumbSize, scale, tx, ty, true);
+      exportCtx.draw(true, () => {
+        wx.canvasToTempFilePath({
+          canvasId: 'exportCanvas',
+          fileType: 'jpg',
+          quality: 0.7,
+          width: thumbSize,
+          height: thumbSize,
+          destWidth: thumbSize,
+          destHeight: thumbSize,
+          success: res => this.persistTempFile(res.tempFilePath, callback),
+          fail: () => callback('')
+        }, this);
+      });
     });
   }
-})
+});

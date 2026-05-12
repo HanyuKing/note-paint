@@ -1,280 +1,442 @@
-/* 确保整个页面是 flex 布局 */
 page {
+  background: #F3F4F6;
   height: 100%;
-  display: flex;
-  flex-direction: column;
 }
 
 .jdraw {
-  background-color: #fff;
   height: 100%;
   display: flex;
   flex-direction: column;
+  padding: 24rpx 24rpx 200rpx;
+  box-sizing: border-box;
+  background: #F3F4F6;
 }
 
-.jdraw .tool {
+/* ===== 顶部工具栏 ===== */
+.toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-around;
-  padding: 8px 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 12px;
-  margin: 10px;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-  gap: 8px;
+  justify-content: space-between;
+  padding: 16rpx 12rpx;
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.04);
 }
 
-.jdraw .separator {
-  color: rgba(255,255,255,0.5);
-  margin: 0 4px;
-}
-
-.jdraw .selected {
-  background-color: rgba(255, 255, 255, 0.4) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  transform: translateY(-1px);
-}
-
-.jdraw .tinct-list {
-  overflow: hidden;
-  white-space: nowrap;
-  margin-top: 15px;
-}
-
-.jdraw .tinct-item {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border-radius: 100%;
-  margin: 0 10px;
-}
-
-.jdraw .tinct-curr::after {
-  content: '';
-  display: block;
-  border: 1px solid #864242;
-  width: 22px;
-  height: 22px;
-  border-radius: 100%;
-  margin-top: -2px;
-  margin-left: -2px;
-}
-
-.jdraw .icon-btn {
-  width: 26px;
-  height: 26px;
+.tool {
+  flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  font-size: 20px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  padding: 3px;
-  background-color: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-.jdraw .icon-btn:hover {
-  background-color: rgba(255, 255, 255, 0.3);
-  transform: translateY(-2px);
-}
-
-.jdraw .icon-btn:active {
-  transform: translateY(-1px) scale(0.95);
-  background-color: rgba(255, 255, 255, 0.4);
-}
-
-.jdraw .help-btn {
-  background-color: rgba(255, 193, 7, 0.3) !important;
-  border: 1px solid rgba(255, 193, 7, 0.5);
   flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  padding: 12rpx 0;
+  border-radius: 14rpx;
+  color: #1F2937;
 }
 
-.jdraw .help-btn:hover {
-  background-color: rgba(255, 193, 7, 0.4) !important;
+.tool.active {
+  background: #EFF6FF;
 }
 
-.jdraw .help-text-line {
-  font-size: 8px;
-  color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  line-height: 1;
+.tool.active .tool-label {
+  color: #2563EB;
+}
+
+.tool-label {
+  font-size: 22rpx;
+  color: #4B5563;
+}
+
+.tool-icon {
+  width: 44rpx;
+  height: 44rpx;
+  position: relative;
+}
+
+/* 选择: 虚线方框 */
+.select-icon {
+  border: 4rpx dashed #1F2937;
+  border-radius: 6rpx;
+}
+
+.tool.active .select-icon {
+  border-color: #2563EB;
+}
+
+/* 画笔: 倾斜的笔形 */
+.pen-icon {
+  width: 44rpx;
+  height: 44rpx;
+}
+
+.pen-icon::before {
+  content: '';
+  position: absolute;
+  left: 6rpx;
+  bottom: 4rpx;
+  width: 36rpx;
+  height: 8rpx;
+  background: #1F2937;
+  border-radius: 4rpx;
+  transform: rotate(-45deg);
+  transform-origin: left bottom;
+}
+
+.pen-icon::after {
+  content: '';
+  position: absolute;
+  left: 4rpx;
+  bottom: 4rpx;
+  width: 0;
+  height: 0;
+  border-left: 8rpx solid transparent;
+  border-right: 8rpx solid transparent;
+  border-top: 12rpx solid #1F2937;
+  transform: rotate(-45deg);
+  transform-origin: left bottom;
+}
+
+.tool.active .pen-icon::before,
+.tool.active .pen-icon::after {
+  background: #2563EB;
+}
+
+.tool.active .pen-icon::after {
+  border-top-color: #2563EB;
+  background: transparent;
+}
+
+/* 橡皮: 倾斜的方块 */
+.eraser-icon::before {
+  content: '';
+  position: absolute;
+  left: 4rpx;
+  top: 12rpx;
+  width: 36rpx;
+  height: 22rpx;
+  border: 4rpx solid #1F2937;
+  border-radius: 4rpx;
+  transform: rotate(-30deg);
+}
+
+.tool.active .eraser-icon::before {
+  border-color: #2563EB;
+}
+
+/* 插图: 图片框 + 小山 */
+.image-icon::before {
+  content: '';
+  position: absolute;
+  inset: 4rpx;
+  border: 4rpx solid #1F2937;
+  border-radius: 6rpx;
+}
+
+.image-icon::after {
+  content: '';
+  position: absolute;
+  left: 10rpx;
+  bottom: 10rpx;
+  width: 24rpx;
+  height: 12rpx;
+  background: #1F2937;
+  clip-path: polygon(0 100%, 35% 30%, 60% 70%, 80% 40%, 100% 100%);
+}
+
+.tool.active .image-icon::before {
+  border-color: #2563EB;
+}
+
+.tool.active .image-icon::after {
+  background: #2563EB;
+}
+
+/* 清空: 垃圾桶 */
+.trash-icon::before {
+  content: '';
+  position: absolute;
+  left: 8rpx;
+  top: 12rpx;
+  width: 28rpx;
+  height: 28rpx;
+  border: 4rpx solid #1F2937;
+  border-top: none;
+  border-radius: 0 0 6rpx 6rpx;
+}
+
+.trash-icon::after {
+  content: '';
+  position: absolute;
+  left: 4rpx;
+  top: 6rpx;
+  width: 36rpx;
+  height: 6rpx;
+  background: #1F2937;
+  border-radius: 3rpx;
+}
+
+.tool.active .trash-icon::before {
+  border-color: #2563EB;
+}
+
+.tool.active .trash-icon::after {
+  background: #2563EB;
+}
+
+/* 撤销: 弧形箭头 */
+.undo-icon::before {
+  content: '';
+  position: absolute;
+  left: 6rpx;
+  top: 10rpx;
+  width: 30rpx;
+  height: 22rpx;
+  border: 4rpx solid #1F2937;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  transform: rotate(45deg);
+}
+
+.undo-icon::after {
+  content: '';
+  position: absolute;
+  left: 4rpx;
+  top: 14rpx;
+  width: 0;
+  height: 0;
+  border-top: 6rpx solid transparent;
+  border-bottom: 6rpx solid transparent;
+  border-right: 10rpx solid #1F2937;
+}
+
+.tool.active .undo-icon::before {
+  border-color: #2563EB;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.tool.active .undo-icon::after {
+  border-right-color: #2563EB;
+}
+
+/* 保存: 软盘 */
+.save-icon::before {
+  content: '';
+  position: absolute;
+  inset: 4rpx;
+  border: 4rpx solid #1F2937;
+  border-radius: 4rpx;
+}
+
+.save-icon::after {
+  content: '';
+  position: absolute;
+  left: 12rpx;
+  top: 8rpx;
+  width: 20rpx;
+  height: 12rpx;
+  background: #1F2937;
+}
+
+.tool.active .save-icon::before {
+  border-color: #2563EB;
+}
+
+.tool.active .save-icon::after {
+  background: #2563EB;
+}
+
+/* ===== 颜色 + 粗细控制栏 ===== */
+.control-bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 20rpx;
+  padding: 12rpx 20rpx;
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.04);
+}
+
+.color-scroll {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  padding: 4rpx 0;
+  box-sizing: border-box;
+}
+
+.color-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.color-item {
+  width: 60rpx;
+  height: 60rpx;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 4rpx solid transparent;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s;
+}
+
+.color-item-active {
+  border-color: #2563EB;
+}
+
+.color-dot {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  border: 2rpx solid #E5E7EB;
+  box-sizing: border-box;
+}
+
+.size-controls {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  width: 240rpx;
+  flex-shrink: 0;
+}
+
+.size-btn {
+  width: 44rpx;
+  height: 44rpx;
+  line-height: 40rpx;
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #4B5563;
+  border-radius: 50%;
+}
+
+.size-btn:active {
+  background: #F3F4F6;
+}
+
+.size-slider {
+  flex: 1;
+  margin: 0;
+}
+
+/* ===== 画布 ===== */
+.canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  margin-top: 20rpx;
+  padding: 8rpx;
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.04);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.canvas-stage {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  border-radius: 14rpx;
+  overflow: hidden;
+  background-color: #FFFFFF;
+  background-image:
+    linear-gradient(to right, rgba(209, 213, 219, 0.4) 1rpx, transparent 1rpx),
+    linear-gradient(to bottom, rgba(209, 213, 219, 0.4) 1rpx, transparent 1rpx);
+  background-size: 32rpx 32rpx;
+}
+
+.canvas-grid {
   display: block;
 }
 
-.jdraw .canvas-container {
-  overflow: hidden;
-  width: 100%;
-  flex: 1; /* 让画布占据剩余空间 */
-  min-height: 0;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  margin: 5px 0 0 0;
-  position: relative;
-  background-color: #ffffff;
-  /* 为底部广告留出空间 (预估高度，根据实际广告高度调整) */
-  margin-bottom: 100px; 
-}
-
-.jdraw .status-overlay {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 5px 10px;
-  border-radius: 15px;
-  font-size: 10px;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.jdraw .status-text {
-  font-size: 10px;
-  color: white;
-  font-weight: normal;
-}
-
-/* 使用说明弹窗样式 */
-.jdraw .tutorial-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.3s ease;
-}
-
-.jdraw .tutorial-overlay.show {
-  opacity: 1;
-  visibility: visible;
-}
-
-/* 缩放比例提示 (Center Toast) */
-.jdraw .zoom-toast {
+/* ===== 缩放提示 ===== */
+.zoom-toast {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%); /* Center it */
-  background-color: rgba(0, 0, 0, 0.7);
-  padding: 15px 30px;
-  border-radius: 12px;
-  z-index: 200;
+  transform: translate(-50%, -50%);
+  padding: 20rpx 40rpx;
+  border-radius: 16rpx;
+  background: rgba(17, 24, 39, 0.85);
+  z-index: 10;
   display: flex;
+  align-items: center;
   justify-content: center;
-  align-items: center;
-  /* cover-view support limited styles, backdrop-filter might not work on native canvas overlay, but try */
 }
 
-.jdraw .zoom-text {
-  color: #fff;
-  font-size: 28px;
-  font-weight: bold;
-  letter-spacing: 1px;
+.zoom-text {
+  color: #FFFFFF;
+  font-size: 40rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
 }
 
-.jdraw .tutorial-modal {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 20px;
-  padding: 30px;
-  margin: 20px;
-  max-width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-  transform: scale(0.8);
-  transition: all 0.3s ease;
-}
-
-.jdraw .tutorial-overlay.show .tutorial-modal {
-  transform: scale(1);
-}
-
-.jdraw .tutorial-header {
-  text-align: center;
-  margin-bottom: 25px;
-}
-
-.jdraw .tutorial-title {
-  font-size: 20px;
-  font-weight: bold;
-  color: white;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.jdraw .tutorial-content {
-  margin-bottom: 25px;
-}
-
-.jdraw .tutorial-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 15px;
-  background-color: rgba(255, 255, 255, 0.1);
-  padding: 12px;
-  border-radius: 12px;
-  backdrop-filter: blur(10px);
-}
-
-.jdraw .tutorial-icon {
-  font-size: 16px;
-  margin-right: 12px;
-  min-width: 20px;
-  text-align: center;
-}
-
-.jdraw .tutorial-text {
-  font-size: 14px;
-  color: white;
-  line-height: 1.4;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-
-.jdraw .tutorial-footer {
-  text-align: center;
-}
-
-.jdraw .tutorial-btn {
-  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
-  color: white;
-  border: none;
-  padding: 12px 30px;
-  border-radius: 25px;
-  font-size: 16px;
-  font-weight: bold;
-  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
-  transition: all 0.3s ease;
-}
-
-.jdraw .tutorial-btn:active {
-  transform: scale(0.95);
-  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
-}
-
-/* 底部广告容器 - 改为固定定位 */
-.ad-container {
+/* ===== 教程弹窗 ===== */
+.tutorial-overlay {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  background-color: rgba(255, 255, 255, 0.9); /* 半透明背景防止文字看不清 */
-  backdrop-filter: blur(10px);
-  padding-bottom: constant(safe-area-inset-bottom);
-  padding-bottom: env(safe-area-inset-bottom);
+  inset: 0;
+  z-index: 9999;
   display: flex;
-  justify-content: center;
   align-items: center;
-  z-index: 1000; /* 确保在最上层 */
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  justify-content: center;
+  padding: 0 60rpx;
+  background: rgba(17, 24, 39, 0.55);
 }
 
+.tutorial-modal {
+  width: 100%;
+  max-height: 80vh;
+  padding: 40rpx 32rpx 32rpx;
+  border-radius: 24rpx;
+  background: #FFFFFF;
+  box-shadow: 0 20rpx 40rpx rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
+}
+
+.tutorial-title {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.tutorial-subtitle {
+  margin-top: 8rpx;
+  font-size: 26rpx;
+  color: #6B7280;
+}
+
+.tutorial-content {
+  margin-top: 24rpx;
+}
+
+.tutorial-item {
+  margin-bottom: 16rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  background: #F9FAFB;
+  font-size: 26rpx;
+  color: #1F2937;
+  line-height: 1.5;
+}
+
+.tutorial-footer {
+  margin-top: 24rpx;
+}
+
+.tutorial-btn {
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
+  border-radius: 14rpx;
+  background: #2563EB;
+  color: #FFFFFF;
+  font-size: 28rpx;
+  font-weight: 600;
+}

@@ -1,70 +1,120 @@
-<view class='jdraw'>
-  <view class='tool'>
-    <!-- 1. 选择工具 -->
-    <view class='icon-btn {{currentMode=="select"?"selected":""}}' data-mode='select' bindtap='switchMode'>👆</view>
-    
-    <view class="separator">|</view>
-
-    <!-- 2. 绘画工具 (点击自动切回 draw 模式) -->
-    <view class='icon-btn {{currentMode=="draw" && brushState=="p"?"selected":""}}' data-state='p' bindtap='switchBrush'>🖌️</view>
-    <view class='icon-btn {{currentMode=="draw" && brushState=="c"?"selected":""}}' data-state='c' bindtap='switchBrush'>🧽</view>
-    
-    <view class="separator">|</view>
-
-    <!-- 3. 其他功能 -->
-    <view class='icon-btn' bindtap='chooseImage'>📷</view>
-    <view class='icon-btn' bindtap='drawClear'>🗑️</view>
-    <view class='icon-btn' bindtap='drawBack'>↶</view>
-    <view class='icon-btn' bindtap='saveToAlbum'>💾</view>
-    <view class='icon-btn help-btn' bindtap='showTutorialAgain'>
-      <text class='help-text-line'>使用</text>
-      <text class='help-text-line'>说明</text>
+<view class="jdraw">
+  <view class="toolbar">
+    <view
+      class="tool {{currentMode=='select' ? 'active' : ''}}"
+      data-mode="select"
+      bindtap="switchMode"
+    >
+      <view class="tool-icon select-icon"></view>
+      <view class="tool-label">选择</view>
+    </view>
+    <view
+      class="tool {{currentMode=='draw' && brushState=='p' ? 'active' : ''}}"
+      data-state="p"
+      bindtap="switchBrush"
+    >
+      <view class="tool-icon pen-icon"></view>
+      <view class="tool-label">画笔</view>
+    </view>
+    <view
+      class="tool {{currentMode=='draw' && brushState=='c' ? 'active' : ''}}"
+      data-state="c"
+      bindtap="switchBrush"
+    >
+      <view class="tool-icon eraser-icon"></view>
+      <view class="tool-label">橡皮</view>
+    </view>
+    <view class="tool" bindtap="chooseImage">
+      <view class="tool-icon image-icon"></view>
+      <view class="tool-label">插图</view>
+    </view>
+    <view class="tool" bindtap="drawClear">
+      <view class="tool-icon trash-icon"></view>
+      <view class="tool-label">清空</view>
+    </view>
+    <view class="tool" bindtap="drawBack">
+      <view class="tool-icon undo-icon"></view>
+      <view class="tool-label">撤销</view>
+    </view>
+    <view class="tool" bindtap="saveBoard">
+      <view class="tool-icon save-icon"></view>
+      <view class="tool-label">保存</view>
     </view>
   </view>
-  <view>
-    <scroll-view scroll-x="true" scroll-left="0" class='tinct-list'>
-      <view wx:for='{{tinctList}}' style='background-color:{{item}}' data-index='{{index}}' bindtap='tinColorChange' class="tinct-item {{tinctCurr==index?'tinct-curr':''}}"></view>
+
+  <view class="control-bar">
+    <scroll-view scroll-x="true" class="color-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="color-list">
+        <view
+          wx:for="{{tinctList}}"
+          wx:key="*this"
+          class="color-item {{tinctCurr===index ? 'color-item-active' : ''}}"
+          data-index="{{index}}"
+          bindtap="tinColorChange"
+        >
+          <view
+            class="color-dot"
+            style="background-color:{{item}}"
+          ></view>
+        </view>
+      </view>
     </scroll-view>
-  </view>
-  <view class="page-section page-section-gap">
-    <view class="body-view">
-      <slider value="{{tinctSize}}" min="1" max="10" bindchange="tinSizechange" show-value/>
+    <view class="size-controls">
+      <view class="size-btn" data-delta="-1" bindtap="adjustSize">−</view>
+      <slider
+        class="size-slider"
+        value="{{tinctSize}}"
+        min="1"
+        max="10"
+        bindchange="tinSizechange"
+        activeColor="#2563EB"
+        block-color="#2563EB"
+        block-size="20"
+        backgroundColor="#E5E7EB"
+      />
+      <view class="size-btn" data-delta="1" bindtap="adjustSize">+</view>
     </view>
   </view>
-  <view class="canvas-container">
-    <canvas style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;" canvas-id="palette" bindtouchstart='touchstart' bindtouchmove='touchMove' bindtouchend='touchEnd' disable-scroll='true' hidden="{{showTutorial}}"></canvas>
-    <!-- 隐形画布用于导出，尺寸动态绑定 exportWidth/Height，移出屏幕外 -->
-    <canvas style="width: {{exportWidth}}px; height: {{exportHeight}}px; position: fixed; left: 10000px; top: 0;" canvas-id="exportCanvas"></canvas>
 
-    <!-- 缩放比例提示 (醒目) -->
-    <cover-view class="zoom-toast" wx:if="{{showScaleToast}}">
-      <cover-view class="zoom-text">{{scalePercent}}%</cover-view>
-    </cover-view>
+  <view class="canvas-wrap">
+    <view class="canvas-stage">
+      <canvas
+        class="canvas-grid"
+        style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
+        canvas-id="palette"
+        bindtouchstart="touchstart"
+        bindtouchmove="touchMove"
+        bindtouchend="touchEnd"
+        disable-scroll="true"
+        hidden="{{showTutorial}}"
+      ></canvas>
+      <canvas
+        style="width: {{exportWidth}}px; height: {{exportHeight}}px; position: fixed; left: 10000px; top: 0;"
+        canvas-id="exportCanvas"
+      ></canvas>
 
-
+      <cover-view class="zoom-toast" wx:if="{{showScaleToast}}">
+        <cover-view class="zoom-text">{{scalePercent}}%</cover-view>
+      </cover-view>
+    </view>
   </view>
-  
-  <!-- 底部广告位 (原生模板/自定义) -->
-  <view class="ad-container" wx:if="{{showAd}}">
-    <ad-custom unit-id="adunit-cc4aafa8c129ec91" bindload="adLoad" binderror="adError" bindclose="adClose"></ad-custom>
-  </view>
-  
-  <!-- 使用说明弹窗 (回归标准 View，通过隐藏 Canvas 解决层级问题) -->
-  <view class="tutorial-overlay show" wx:if="{{showTutorial}}" bindtap="closeTutorial">
-    <view class="tutorial-modal">
-        <view class="tutorial-header">
-            <text class="tutorial-title">操作指南</text>
-        </view>
-        <view class="tutorial-content">
-            <view class="tutorial-item">👆 顶部工具：点击直接切换【选择/画笔/橡皮】</view>
-            <view class="tutorial-item">🖌️ 绘画模式：单指绘画，双指放大、缩小、扩展画布</view>
-            <view class="tutorial-item">👆 选择模式：点选对象 / 空白处拖动平移</view>
-            <view class="tutorial-item">📷 插入图片：点击相机图标插入</view>
-            <view class="tutorial-item">💾 保存：导出全景图片到相册</view>
-        </view>
-        <view class="tutorial-footer">
-            <button class="tutorial-btn" bindtap="closeTutorial">点击任意处关闭</button>
-        </view>
+
+  <view class="tutorial-overlay" wx:if="{{showTutorial}}" bindtap="closeTutorial">
+    <view class="tutorial-modal" catchtap="stopPropagation">
+      <view class="tutorial-header">
+        <view class="tutorial-title">使用说明</view>
+        <view class="tutorial-subtitle">快速了解画板的基本操作</view>
+      </view>
+      <view class="tutorial-content">
+        <view class="tutorial-item">画笔：选择颜色和粗细后，在画板上自由绘制。</view>
+        <view class="tutorial-item">橡皮：使用白色笔迹覆盖已有内容。</view>
+        <view class="tutorial-item">选择：点选对象后可拖动位置；空白处单指拖动可平移视图。</view>
+        <view class="tutorial-item">插图：从相册或相机插入图片，可继续在上面批注。</view>
+        <view class="tutorial-item">保存：保存为可继续编辑的本地文件，可在“文件”tab 查看。</view>
+      </view>
+      <view class="tutorial-footer">
+        <view class="tutorial-btn" bindtap="closeTutorial">知道了</view>
+      </view>
     </view>
   </view>
 </view>

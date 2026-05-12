@@ -1,12 +1,30 @@
 {
   "pages": [
-    "page/component/jdraw/jdraw"
+    "page/component/jdraw/jdraw",
+    "page/component/file-list/file-list"
   ],
   "window": {
     "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#fff",
+    "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTitleText": "笔记画板",
     "navigationBarTextStyle": "black"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#9CA3AF",
+    "selectedColor": "#2563EB",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "page/component/jdraw/jdraw",
+        "text": "画板"
+      },
+      {
+        "pagePath": "page/component/file-list/file-list",
+        "text": "文件"
+      }
+    ]
   },
   "sitemapLocation": "sitemap.json",
   "__usePrivacyCheck__": true,
