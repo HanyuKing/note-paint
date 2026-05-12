@@ -1,0 +1,16 @@
+<view class="tabbar {{hidden ? 'tabbar-hidden' : ''}}" hidden="{{hidden}}">
+  <view
+    class="tab {{selected === index ? 'tab-on' : ''}}"
+    wx:for="{{list}}"
+    wx:key="pagePath"
+    data-index="{{index}}"
+    bindtap="switchTab"
+  >
+    <view class="icon">
+      <view wx:if="{{index === 0}}" class="icon-shape board {{selected === index ? 'on' : ''}}"></view>
+      <view wx:else class="icon-shape folder {{selected === index ? 'on' : ''}}"></view>
+    </view>
+    <view class="label">{{item.text}}</view>
+    <view class="indicator {{selected === index ? 'indicator-on' : ''}}"></view>
+  </view>
+</view>

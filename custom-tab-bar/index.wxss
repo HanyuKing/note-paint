@@ -1,0 +1,129 @@
+.tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 120rpx;
+  display: flex;
+  background: #FFFFFF;
+  border-top: 1rpx solid #F3F4F6;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+}
+
+.tabbar-hidden {
+  display: none !important;
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #9CA3AF;
+  font-size: 22rpx;
+  gap: 4rpx;
+  padding: 12rpx 0 8rpx;
+  position: relative;
+}
+
+.tab-on {
+  color: #2563EB;
+}
+
+.icon {
+  width: 52rpx;
+  height: 52rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.icon-shape {
+  width: 40rpx;
+  height: 40rpx;
+  position: relative;
+}
+
+/* 画板：调色板（圆形 + 三个点） */
+.icon-shape.board {
+  border-radius: 50%;
+  border: 3rpx solid #9CA3AF;
+  background: transparent;
+}
+
+.icon-shape.board::before,
+.icon-shape.board::after {
+  content: '';
+  position: absolute;
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: #9CA3AF;
+}
+
+.icon-shape.board::before {
+  top: 6rpx;
+  left: 14rpx;
+}
+
+.icon-shape.board::after {
+  top: 18rpx;
+  right: 6rpx;
+}
+
+.icon-shape.board.on {
+  border-color: #2563EB;
+}
+
+.icon-shape.board.on::before,
+.icon-shape.board.on::after {
+  background: #2563EB;
+}
+
+/* 文件夹 */
+.icon-shape.folder {
+  width: 46rpx;
+  height: 34rpx;
+  border: 3rpx solid #9CA3AF;
+  border-radius: 4rpx 8rpx 8rpx 8rpx;
+  background: transparent;
+  margin-top: 6rpx;
+}
+
+.icon-shape.folder::before {
+  content: '';
+  position: absolute;
+  top: -10rpx;
+  left: -3rpx;
+  width: 22rpx;
+  height: 10rpx;
+  border: 3rpx solid #9CA3AF;
+  border-bottom: none;
+  border-radius: 4rpx 4rpx 0 0;
+  background: transparent;
+}
+
+.icon-shape.folder.on,
+.icon-shape.folder.on::before {
+  border-color: #2563EB;
+}
+
+.label {
+  font-size: 22rpx;
+  line-height: 1;
+}
+
+.indicator {
+  width: 32rpx;
+  height: 4rpx;
+  border-radius: 2rpx;
+  background: transparent;
+  margin-top: 2rpx;
+}
+
+.indicator-on {
+  background: #2563EB;
+}

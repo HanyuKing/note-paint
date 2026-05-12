@@ -28,10 +28,6 @@
       <view class="tool-icon image-icon"></view>
       <view class="tool-label">插图</view>
     </view>
-    <view class="tool" bindtap="drawClear">
-      <view class="tool-icon trash-icon"></view>
-      <view class="tool-label">清空</view>
-    </view>
     <view class="tool" bindtap="drawBack">
       <view class="tool-icon undo-icon"></view>
       <view class="tool-label">撤销</view>
@@ -40,39 +36,109 @@
       <view class="tool-icon save-icon"></view>
       <view class="tool-label">保存</view>
     </view>
+    <view class="tool" bindtap="exportImage">
+      <view class="tool-icon export-icon"></view>
+      <view class="tool-label">导出</view>
+    </view>
   </view>
 
-  <view class="control-bar">
-    <scroll-view scroll-x="true" class="color-scroll" enhanced show-scrollbar="{{false}}">
-      <view class="color-list">
-        <view
-          wx:for="{{tinctList}}"
-          wx:key="*this"
-          class="color-item {{tinctCurr===index ? 'color-item-active' : ''}}"
-          data-index="{{index}}"
-          bindtap="tinColorChange"
-        >
-          <view
-            class="color-dot"
-            style="background-color:{{item}}"
-          ></view>
-        </view>
+  <view wx:if="{{currentMode==='draw' && brushState==='p'}}" class="palette">
+    <view class="color-row">
+      <view
+        class="rainbow-btn {{tinctCurr===-1 ? 'rainbow-active' : ''}}"
+        catchtap="openColorPicker"
+      >
+        <view class="rainbow-inner"></view>
       </view>
-    </scroll-view>
-    <view class="size-controls">
-      <view class="size-btn" data-delta="-1" bindtap="adjustSize">−</view>
+      <view
+        wx:for="{{primaryColors}}"
+        wx:key="index"
+        class="color-item {{tinctCurr===item.index ? 'color-item-active' : ''}}"
+        data-index="{{item.index}}"
+        catchtap="tinColorChange"
+      >
+        <view class="color-dot" style="background-color:{{item.value}}"></view>
+      </view>
+    </view>
+
+    <view class="size-row">
+      <view class="size-btn" data-delta="-1" catchtap="adjustSize">−</view>
       <slider
         class="size-slider"
         value="{{tinctSize}}"
         min="1"
         max="10"
         bindchange="tinSizechange"
-        activeColor="#2563EB"
-        block-color="#2563EB"
-        block-size="20"
+        activeColor="#111827"
+        block-color="#FFFFFF"
+        block-size="24"
         backgroundColor="#E5E7EB"
       />
-      <view class="size-btn" data-delta="1" bindtap="adjustSize">+</view>
+      <view class="size-btn" data-delta="1" catchtap="adjustSize">+</view>
+      <view class="size-num">{{tinctSize}}px</view>
+    </view>
+  </view>
+
+  <view wx:if="{{showColorPicker}}" class="picker-mask" bindtap="closeColorPicker">
+    <view class="picker-panel" catchtap="stopPropagation">
+      <view class="picker-head">
+        <view class="picker-cancel" bindtap="closeColorPicker">取消</view>
+        <view class="picker-title">选择颜色</view>
+        <view class="picker-done" bindtap="confirmCustomColor">完成</view>
+      </view>
+
+      <view class="picker-preview-row">
+        <view class="picker-preview-dot" style="background-color: {{pickerColor}};"></view>
+        <view class="picker-hex">{{pickerColor}}</view>
+      </view>
+
+      <view class="picker-bar-wrap">
+        <view class="picker-label">色相</view>
+        <view class="hue-track">
+          <view class="hue-strip"></view>
+          <slider
+            class="hue-slider"
+            value="{{pickerHue}}"
+            min="0"
+            max="359"
+            bindchanging="onHueChange"
+            bindchange="onHueChange"
+            block-color="#FFFFFF"
+            block-size="24"
+            activeColor="rgba(0,0,0,0)"
+            backgroundColor="rgba(0,0,0,0)"
+          />
+        </view>
+      </view>
+
+      <view class="picker-bar-wrap">
+        <view class="picker-label">明度</view>
+        <slider
+          class="picker-slider"
+          value="{{pickerLight}}"
+          min="10"
+          max="90"
+          bindchanging="onLightChange"
+          bindchange="onLightChange"
+          block-color="#FFFFFF"
+          block-size="24"
+          activeColor="#111827"
+          backgroundColor="#E5E7EB"
+        />
+      </view>
+
+      <view class="picker-presets-title">常用预设</view>
+      <view class="picker-presets">
+        <view
+          wx:for="{{tinctList}}"
+          wx:key="*this"
+          class="color-item {{pickerColor===item ? 'color-item-active' : ''}}"
+          data-color="{{item}}"
+          bindtap="onPresetPick"
+        >
+          <view class="color-dot" style="background-color:{{item}}"></view>
+        </view>
+      </view>
     </view>
   </view>
 

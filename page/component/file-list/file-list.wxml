@@ -1,0 +1,90 @@
+<view class="page">
+  <view class="search-wrap">
+    <view class="search">
+      <view class="search-icon"></view>
+      <input
+        class="search-input"
+        placeholder="搜索作品"
+        placeholder-class="search-placeholder"
+        value="{{keyword}}"
+        bindinput="onSearchInput"
+        confirm-type="search"
+      />
+      <view wx:if="{{keyword}}" class="search-clear" bindtap="clearSearch">×</view>
+    </view>
+  </view>
+
+  <view wx:if="{{!hasFiles}}" class="empty">
+    <view class="empty-illus">
+      <view class="empty-circle"></view>
+      <view class="empty-line"></view>
+      <view class="empty-line short"></view>
+    </view>
+    <view class="empty-title">还没有画板文件</view>
+    <view class="empty-desc">点击下方“画板”开始创作</view>
+  </view>
+
+  <view wx:elif="{{filtered.length === 0}}" class="empty">
+    <view class="empty-title">没有匹配的作品</view>
+    <view class="empty-desc">换个关键词试试</view>
+  </view>
+
+  <view wx:else class="grid">
+    <view
+      wx:for="{{filtered}}"
+      wx:key="id"
+      class="card"
+      data-id="{{item.id}}"
+      bindtap="openBoard"
+    >
+      <view class="thumb">
+        <image
+          wx:if="{{item.thumbnail}}"
+          class="thumb-img"
+          src="{{item.thumbnail}}"
+          mode="aspectFill"
+        ></image>
+        <view wx:else class="thumb-placeholder">
+          <view class="sketch sketch-1"></view>
+          <view class="sketch sketch-2"></view>
+          <view class="sketch sketch-3"></view>
+        </view>
+      </view>
+      <view class="card-name">{{item.name}}</view>
+      <view class="card-foot">
+        <view class="card-time">{{item.updatedAtText}}</view>
+        <view
+          class="more-btn"
+          catchtap="onMoreTap"
+          data-id="{{item.id}}"
+          data-name="{{item.name}}"
+        >...</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="fab" catchtap="createNewBoard" hover-class="fab-hover" hover-stay-time="80">
+    <view class="fab-btn">
+      <view class="fab-icon"></view>
+    </view>
+    <view class="fab-label">新建画板</view>
+  </view>
+
+  <view wx:if="{{renameVisible}}" class="modal-mask" catchtap="cancelRename">
+    <view class="modal" catchtap="stopPropagation">
+      <view class="modal-title">重命名画板</view>
+      <view class="modal-desc">输入新的画板名称</view>
+      <input
+        class="modal-input"
+        value="{{renameValue}}"
+        bindinput="onRenameInput"
+        maxlength="30"
+        focus
+      />
+      <view class="modal-actions">
+        <view class="modal-btn ghost" bindtap="cancelRename">取消</view>
+        <view class="modal-btn primary" bindtap="confirmRename">确定</view>
+      </view>
+    </view>
+  </view>
+</view>

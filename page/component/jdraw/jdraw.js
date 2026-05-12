@@ -1,5 +1,52 @@
 const boardStore = require('../../../utils/boardStore');
 
+function toHex(n) {
+  const h = Math.max(0, Math.min(255, Math.round(n))).toString(16);
+  return h.length < 2 ? '0' + h : h;
+}
+
+function hslToHex(h, s, l) {
+  s = s / 100;
+  l = l / 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = function (n) {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return toHex(color * 255);
+  };
+  return '#' + f(0) + f(8) + f(4);
+}
+
+function hexToHsl(hex) {
+  if (!hex || hex.charAt(0) !== '#') return { h: 0, s: 0, l: 50 };
+  let v = hex.slice(1);
+  if (v.length === 3) v = v.split('').map(c => c + c).join('');
+  if (v.length !== 6) return { h: 0, s: 0, l: 50 };
+  const r = parseInt(v.slice(0, 2), 16) / 255;
+  const g = parseInt(v.slice(2, 4), 16) / 255;
+  const b = parseInt(v.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0;
+  let s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h *= 60;
+  }
+  return {
+    h: Math.round(h),
+    s: Math.round(s * 100),
+    l: Math.round(l * 100)
+  };
+}
+
 Page({
   data: {
     graphObjects: [],
@@ -10,8 +57,8 @@ Page({
     tinctList: [
       '#000000',
       '#EF4444',
-      '#F97316',
       '#F59E0B',
+      '#FBBF24',
       '#10B981',
       '#3B82F6',
       '#2563EB',
@@ -21,8 +68,22 @@ Page({
       '#9CA3AF',
       '#FFFFFF'
     ],
+    primaryColors: [
+      { index: 0, value: '#000000' },
+      { index: 1, value: '#EF4444' },
+      { index: 2, value: '#F59E0B' },
+      { index: 4, value: '#10B981' },
+      { index: 5, value: '#3B82F6' },
+      { index: 8, value: '#8B5CF6' }
+    ],
     tinctCurr: 0,
     tinctSize: 3,
+    customColor: '',
+
+    showColorPicker: false,
+    pickerHue: 0,
+    pickerLight: 50,
+    pickerColor: '#000000',
 
     canvasWidth: 800,
     canvasHeight: 1000,
@@ -46,6 +107,7 @@ Page({
     fileName: '',
     hasChanges: false,
     isSavingBoard: false,
+    isExportingImage: false,
 
     exportWidth: 0,
     exportHeight: 0
@@ -87,6 +149,12 @@ Page({
     if (pending === '__reset__') {
       app.globalData.pendingFileId = '';
       this.applyEmptyBoard();
+      return;
+    }
+
+    if (pending === '__new__') {
+      app.globalData.pendingFileId = '';
+      this.createNewBoard();
       return;
     }
 
@@ -150,6 +218,7 @@ Page({
       brushState: data.brushState || 'p',
       tinctCurr: typeof data.tinctCurr === 'number' ? data.tinctCurr : 0,
       tinctSize: data.tinctSize || 3,
+      customColor: data.customColor || '',
       currentMode: data.currentMode || 'draw',
       activeObjectId: null
     }, () => {
@@ -175,7 +244,9 @@ Page({
       scale: 1,
       translateX: 0,
       translateY: 0,
-      activeObjectId: null
+      activeObjectId: null,
+      customColor: '',
+      tinctCurr: 0
     });
     const app = getApp();
     if (app && app.globalData) app.globalData.currentEditingFileId = '';
@@ -185,6 +256,106 @@ Page({
     if (!this.data.hasChanges) {
       this.setData({ hasChanges: true });
     }
+  },
+
+  // ---------- 新建画板 ----------
+
+  createNewBoard() {
+    const hasContent = (this.data.graphObjects && this.data.graphObjects.length > 0) || !!this.data.currentFileId;
+    if (!hasContent) {
+      this.applyEmptyBoard();
+      return;
+    }
+    if (!this.data.hasChanges) {
+      this.applyEmptyBoard();
+      return;
+    }
+    wx.showModal({
+      title: '新建画板？',
+      content: '当前画板尚有未保存的修改，新建后将丢失这些修改。',
+      confirmText: '新建',
+      cancelText: '取消',
+      confirmColor: '#2563EB',
+      success: res => {
+        if (res.confirm) this.applyEmptyBoard();
+      }
+    });
+  },
+
+  // ---------- 当前颜色 ----------
+
+  getCurrentColor() {
+    const idx = this.data.tinctCurr;
+    if (idx === -1 && this.data.customColor) return this.data.customColor;
+    const colors = this.data.tinctList || [];
+    return colors[idx] || colors[0] || '#000000';
+  },
+
+  // ---------- 任意颜色弹层 ----------
+
+  setTabBarHidden(hidden) {
+    if (typeof this.getTabBar === 'function') {
+      const tb = this.getTabBar();
+      if (tb && tb.setData) tb.setData({ hidden: !!hidden });
+    }
+  },
+
+  openColorPicker() {
+    const current = this.getCurrentColor();
+    const hsl = hexToHsl(current);
+    let hue = hsl.h;
+    let light = hsl.l;
+    if (light < 20 || light > 80) light = 50;
+    const previewHex = hslToHex(hue, 80, light);
+    this.setTabBarHidden(true);
+    this.setData({
+      showColorPicker: true,
+      pickerHue: hue,
+      pickerLight: light,
+      pickerColor: previewHex
+    });
+  },
+
+  closeColorPicker() {
+    this.setTabBarHidden(false);
+    this.setData({ showColorPicker: false });
+  },
+
+  onHueChange(e) {
+    const hue = Number(e.detail.value);
+    const hex = hslToHex(hue, 80, this.data.pickerLight);
+    this.setData({ pickerHue: hue, pickerColor: hex });
+  },
+
+  onLightChange(e) {
+    const light = Number(e.detail.value);
+    const hex = hslToHex(this.data.pickerHue, 80, light);
+    this.setData({ pickerLight: light, pickerColor: hex });
+  },
+
+  onPresetPick(e) {
+    const color = e.currentTarget.dataset.color;
+    if (!color) return;
+    const hsl = hexToHsl(color);
+    this.setData({
+      pickerColor: color,
+      pickerHue: hsl.h,
+      pickerLight: hsl.l < 10 ? 10 : (hsl.l > 90 ? 90 : hsl.l)
+    });
+  },
+
+  confirmCustomColor() {
+    const color = this.data.pickerColor || '#000000';
+    const tinctList = this.data.tinctList || [];
+    const presetIndex = tinctList.indexOf(color);
+    this.setTabBarHidden(false);
+    this.setData({
+      customColor: presetIndex >= 0 ? '' : color,
+      tinctCurr: presetIndex >= 0 ? presetIndex : -1,
+      brushState: 'p',
+      currentMode: 'draw',
+      showColorPicker: false
+    });
   },
 
   // ---------- 首次使用 ----------
@@ -281,8 +452,7 @@ Page({
       let tinct, lineWidth;
       const brushState = this.data.brushState || 'p';
       if (brushState === 'p') {
-        const colors = this.data.tinctList || [];
-        tinct = colors[this.data.tinctCurr || 0] || '#000000';
+        tinct = this.getCurrentColor();
         lineWidth = this.data.tinctSize || 3;
       } else {
         tinct = '#ffffff';
@@ -526,7 +696,8 @@ Page({
 
   tinColorChange(e) {
     this.setData({
-      tinctCurr: e.currentTarget.dataset.index,
+      tinctCurr: Number(e.currentTarget.dataset.index),
+      customColor: '',
       brushState: 'p',
       currentMode: 'draw'
     });
@@ -632,6 +803,110 @@ Page({
     });
   },
 
+  // ---------- 导出到相册 ----------
+
+  exportImage() {
+    if (this.data.isExportingImage) return;
+    if (!this.data.graphObjects || this.data.graphObjects.length === 0) {
+      wx.showToast({ title: '画板为空', icon: 'none' });
+      return;
+    }
+
+    const bounds = this.data.canvasBounds;
+    const contentWidth = Math.max(bounds.maxX - bounds.minX, 1);
+    const contentHeight = Math.max(bounds.maxY - bounds.minY, 1);
+    const padding = 40;
+    const maxLong = 1400;
+    const longSide = Math.max(contentWidth, contentHeight);
+    const renderScale = longSide > maxLong - padding * 2 ? (maxLong - padding * 2) / longSide : 1;
+    const exportWidth = Math.round(contentWidth * renderScale + padding * 2);
+    const exportHeight = Math.round(contentHeight * renderScale + padding * 2);
+    const tx = padding - bounds.minX * renderScale;
+    const ty = padding - bounds.minY * renderScale;
+
+    this.setData({
+      isExportingImage: true,
+      exportWidth,
+      exportHeight
+    }, () => {
+      wx.showLoading({ title: '导出中...', mask: true });
+      const exportCtx = wx.createCanvasContext('exportCanvas', this);
+      this.renderToContext(exportCtx, exportWidth, exportHeight, renderScale, tx, ty, true);
+      exportCtx.draw(true, () => {
+        wx.canvasToTempFilePath({
+          canvasId: 'exportCanvas',
+          fileType: 'png',
+          quality: 1,
+          width: exportWidth,
+          height: exportHeight,
+          destWidth: exportWidth,
+          destHeight: exportHeight,
+          success: res => this.saveToAlbum(res.tempFilePath),
+          fail: () => {
+            wx.hideLoading();
+            this.setData({ isExportingImage: false });
+            wx.showToast({ title: '导出失败', icon: 'none' });
+          }
+        }, this);
+      });
+    });
+  },
+
+  saveToAlbum(tempFilePath) {
+    const finish = (ok, msg) => {
+      wx.hideLoading();
+      this.setData({ isExportingImage: false });
+      wx.showToast({ title: msg, icon: ok ? 'success' : 'none' });
+    };
+
+    const doSave = () => {
+      wx.saveImageToPhotosAlbum({
+        filePath: tempFilePath,
+        success: () => finish(true, '已保存到相册'),
+        fail: err => {
+          if (err && /cancel/i.test(err.errMsg || '')) {
+            finish(false, '已取消');
+          } else {
+            finish(false, '保存失败');
+          }
+        }
+      });
+    };
+
+    wx.getSetting({
+      success: settingRes => {
+        if (settingRes.authSetting['scope.writePhotosAlbum'] === false) {
+          wx.hideLoading();
+          wx.showModal({
+            title: '需要相册权限',
+            content: '保存到相册需要授权访问相册，是否前往开启？',
+            confirmText: '去开启',
+            success: modalRes => {
+              if (modalRes.confirm) {
+                wx.openSetting({
+                  success: settingRes2 => {
+                    if (settingRes2.authSetting['scope.writePhotosAlbum']) {
+                      wx.showLoading({ title: '导出中...', mask: true });
+                      doSave();
+                    } else {
+                      this.setData({ isExportingImage: false });
+                    }
+                  },
+                  fail: () => this.setData({ isExportingImage: false })
+                });
+              } else {
+                this.setData({ isExportingImage: false });
+              }
+            }
+          });
+        } else {
+          doSave();
+        }
+      },
+      fail: () => doSave()
+    });
+  },
+
   // ---------- 保存 ----------
 
   saveBoard() {
@@ -684,6 +959,7 @@ Page({
       brushState: this.data.brushState,
       tinctCurr: this.data.tinctCurr,
       tinctSize: this.data.tinctSize,
+      customColor: this.data.customColor || '',
       currentMode: this.data.currentMode
     };
   },
