@@ -40,6 +40,10 @@
       <view class="tool-icon export-icon"></view>
       <view class="tool-label">导出</view>
     </view>
+    <view class="tool" bindtap="openTutorial">
+      <view class="tool-icon help-icon"></view>
+      <view class="tool-label">说明</view>
+    </view>
   </view>
 
   <view wx:if="{{currentMode==='draw' && brushState==='p'}}" class="palette">
@@ -172,11 +176,30 @@
         <view class="tutorial-subtitle">快速了解画板的基本操作</view>
       </view>
       <view class="tutorial-content">
-        <view class="tutorial-item">画笔：选择颜色和粗细后，在画板上自由绘制。</view>
-        <view class="tutorial-item">橡皮：使用白色笔迹覆盖已有内容。</view>
-        <view class="tutorial-item">选择：点选对象后可拖动位置；空白处单指拖动可平移视图。</view>
-        <view class="tutorial-item">插图：从相册或相机插入图片，可继续在上面批注。</view>
-        <view class="tutorial-item">保存：保存为可继续编辑的本地文件，可在“文件”tab 查看。</view>
+        <view class="tutorial-item">
+          <view class="tutorial-icon"><view class="tool-icon select-icon"></view></view>
+          <view class="tutorial-text">选择：点选对象后可拖动位置；空白处单指拖动可平移视图。</view>
+        </view>
+        <view class="tutorial-item">
+          <view class="tutorial-icon"><view class="tool-icon pen-icon"></view></view>
+          <view class="tutorial-text">画笔：选择颜色和粗细后，在画板上自由绘制。</view>
+        </view>
+        <view class="tutorial-item">
+          <view class="tutorial-icon"><view class="tool-icon eraser-icon"></view></view>
+          <view class="tutorial-text">橡皮：使用白色笔迹覆盖已有内容。</view>
+        </view>
+        <view class="tutorial-item">
+          <view class="tutorial-icon"><view class="tool-icon image-icon"></view></view>
+          <view class="tutorial-text">插图：从相册或相机插入图片，可继续在上面批注。</view>
+        </view>
+        <view class="tutorial-item">
+          <view class="tutorial-icon"><view class="tool-icon save-icon"></view></view>
+          <view class="tutorial-text">保存：保存为可继续编辑的本地文件，可在“文件”tab 查看。</view>
+        </view>
+        <view class="tutorial-item">
+          <view class="tutorial-icon"><view class="tool-icon export-icon"></view></view>
+          <view class="tutorial-text">导出：将当前画板内容保存为图片到系统相册。</view>
+        </view>
       </view>
       <view class="tutorial-footer">
         <view class="tutorial-btn" bindtap="closeTutorial">知道了</view>

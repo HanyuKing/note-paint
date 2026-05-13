@@ -119,7 +119,10 @@ Page({
 
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
-      this.getTabBar().setData({ selected: 0 });
+      this.getTabBar().setData({
+        selected: 0,
+        hidden: !!(this.data.showTutorial || this.data.showColorPicker)
+      });
     }
     this.consumePendingFileId(false);
   },
@@ -363,14 +366,22 @@ Page({
   checkFirstTimeUser() {
     try {
       if (!wx.getStorageSync('hasUsedNotePaint')) {
-        setTimeout(() => this.setData({ showTutorial: true }), 500);
+        setTimeout(() => {
+          this.openTutorial();
+        }, 500);
       }
     } catch (e) {
       console.error('检查首次使用状态失败:', e);
     }
   },
 
+  openTutorial() {
+    this.setTabBarHidden(true);
+    this.setData({ showTutorial: true });
+  },
+
   closeTutorial() {
+    this.setTabBarHidden(false);
     this.setData({ showTutorial: false });
     try {
       wx.setStorageSync('hasUsedNotePaint', true);

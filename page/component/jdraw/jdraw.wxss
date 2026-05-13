@@ -280,6 +280,28 @@ page {
     8rpx 6rpx 0 -2rpx #111827;
 }
 
+/* 说明: 问号圆圈 */
+.help-icon::before {
+  content: '';
+  position: absolute;
+  inset: 4rpx;
+  border: 4rpx solid #1F2937;
+  border-radius: 50%;
+}
+
+.help-icon::after {
+  content: '?';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1rpx;
+  text-align: center;
+  color: #1F2937;
+  font-size: 34rpx;
+  font-weight: 700;
+  line-height: 44rpx;
+}
+
 /* ===== 颜色 + 粗细 悬浮调色板 ===== */
 .palette {
   position: fixed;
@@ -567,10 +589,6 @@ page {
   border-radius: 14rpx;
   overflow: hidden;
   background-color: #FFFFFF;
-  background-image:
-    linear-gradient(to right, rgba(209, 213, 219, 0.4) 1rpx, transparent 1rpx),
-    linear-gradient(to bottom, rgba(209, 213, 219, 0.4) 1rpx, transparent 1rpx);
-  background-size: 32rpx 32rpx;
 }
 
 .canvas-grid {
@@ -607,8 +625,9 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 60rpx;
+  padding: 0 60rpx calc(120rpx + env(safe-area-inset-bottom));
   background: rgba(17, 24, 39, 0.55);
+  box-sizing: border-box;
 }
 
 .tutorial-modal {
@@ -642,6 +661,29 @@ page {
   padding: 16rpx 20rpx;
   border-radius: 12rpx;
   background: #F9FAFB;
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+}
+
+.tutorial-icon {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 18rpx;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2rpx 8rpx rgba(17, 24, 39, 0.06);
+}
+
+.tutorial-icon .tool-icon {
+  transform: scale(0.78);
+}
+
+.tutorial-text {
+  flex: 1;
   font-size: 26rpx;
   color: #1F2937;
   line-height: 1.5;
