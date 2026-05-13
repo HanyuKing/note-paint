@@ -67,6 +67,44 @@ function clamp01(value) {
   return Math.max(0, Math.min(1, value));
 }
 
+function setStrokeStyleCompat(ctx, value) {
+  if (!ctx) return;
+  if (typeof ctx.setStrokeStyle === 'function') ctx.setStrokeStyle(value);
+  else ctx.strokeStyle = value;
+}
+
+function setFillStyleCompat(ctx, value) {
+  if (!ctx) return;
+  if (typeof ctx.setFillStyle === 'function') ctx.setFillStyle(value);
+  else ctx.fillStyle = value;
+}
+
+function setLineWidthCompat(ctx, value) {
+  if (!ctx) return;
+  if (typeof ctx.setLineWidth === 'function') ctx.setLineWidth(value);
+  else ctx.lineWidth = value;
+}
+
+function setLineCapCompat(ctx, value) {
+  if (!ctx) return;
+  if (typeof ctx.setLineCap === 'function') ctx.setLineCap(value);
+  else ctx.lineCap = value;
+}
+
+function setLineJoinCompat(ctx, value) {
+  if (!ctx) return;
+  if (typeof ctx.setLineJoin === 'function') ctx.setLineJoin(value);
+  else ctx.lineJoin = value;
+}
+
+function flushCanvasCompat(ctx, preserve, callback) {
+  if (ctx && typeof ctx.draw === 'function') {
+    ctx.draw(!!preserve, callback);
+    return;
+  }
+  if (typeof callback === 'function') callback();
+}
+
 /** 取值 0～max → thumb-lane（两端圆帽圆心之间）上 0%～100%，与 WXSS inset 同步 */
 function sliderThumbLinePct(value, maxVal) {
   if (!maxVal) return 0;
@@ -271,17 +309,52 @@ Page({
   },
 
   onReady() {
-    this.context = wx.createCanvasContext('palette');
     const sysInfo = wx.getSystemInfoSync();
+    this.pixelRatio = sysInfo.pixelRatio || 1;
     this.setData({
       screenWidth: sysInfo.windowWidth,
       screenHeight: sysInfo.windowHeight
     });
+    this.initMainCanvas();
     this.checkFirstTimeUser();
+  },
 
-    if (this.data.graphObjects.length > 0) {
-      this.redrawCanvas();
+  initMainCanvas() {
+    wx.createSelectorQuery()
+      .in(this)
+      .select('#palette')
+      .fields({ node: true, size: true }, res => {
+        if (!res || !res.node) return;
+        this.mainCanvas = res.node;
+        this.context = res.node.getContext('2d');
+        this.syncMainCanvasSize();
+        if (this.data.graphObjects.length > 0) {
+          this.redrawCanvas();
+        } else {
+          this.clearMainCanvas();
+        }
+      })
+      .exec();
+  },
+
+  syncMainCanvasSize() {
+    if (!this.mainCanvas || !this.context) return;
+    const width = Math.max(1, Math.round(this.data.canvasWidth || 1));
+    const height = Math.max(1, Math.round(this.data.canvasHeight || 1));
+    const dpr = this.pixelRatio || 1;
+    const realWidth = width * dpr;
+    const realHeight = height * dpr;
+    if (this.mainCanvas.width !== realWidth) this.mainCanvas.width = realWidth;
+    if (this.mainCanvas.height !== realHeight) this.mainCanvas.height = realHeight;
+    if (typeof this.context.setTransform === 'function') {
+      this.context.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
+  },
+
+  clearMainCanvas() {
+    if (!this.context) return;
+    this.syncMainCanvasSize();
+    this.context.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
   },
 
   // ---------- 文件加载 ----------
@@ -375,10 +448,7 @@ Page({
   },
 
   applyEmptyBoard() {
-    if (this.context) {
-      this.context.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
-      this.context.draw();
-    }
+    this.clearMainCanvas();
     this.setData({
       currentFileId: '',
       fileName: '',
@@ -652,10 +722,19 @@ Page({
 
   // ---------- 坐标 / 边界 ----------
 
-  screenToCanvas(screenX, screenY) {
+  getCanvasContentOffset() {
+    const bounds = this.data.canvasBounds || { minX: 0, minY: 0 };
     return {
-      x: (screenX - this.data.translateX) / this.data.scale,
-      y: (screenY - this.data.translateY) / this.data.scale
+      x: -(bounds.minX || 0),
+      y: -(bounds.minY || 0)
+    };
+  },
+
+  screenToCanvas(screenX, screenY) {
+    const offset = this.getCanvasContentOffset();
+    return {
+      x: (screenX - this.data.translateX) / this.data.scale - offset.x,
+      y: (screenY - this.data.translateY) / this.data.scale - offset.y
     };
   },
 
@@ -667,6 +746,7 @@ Page({
 
   expandCanvasBounds(x, y) {
     const bounds = this.data.canvasBounds;
+    const prevOffset = this.getCanvasContentOffset();
     let needUpdate = false;
     const padding = 50;
     if (x < bounds.minX) { bounds.minX = Math.floor(x - padding); needUpdate = true; }
@@ -674,10 +754,16 @@ Page({
     if (y < bounds.minY) { bounds.minY = Math.floor(y - padding); needUpdate = true; }
     if (y > bounds.maxY) { bounds.maxY = Math.ceil(y + padding); needUpdate = true; }
     if (needUpdate) {
+      const nextOffset = {
+        x: -(bounds.minX || 0),
+        y: -(bounds.minY || 0)
+      };
       this.setData({
         canvasBounds: bounds,
         canvasWidth: bounds.maxX - bounds.minX,
-        canvasHeight: bounds.maxY - bounds.minY
+        canvasHeight: bounds.maxY - bounds.minY,
+        translateX: this.data.translateX + (prevOffset.x - nextOffset.x) * this.data.scale,
+        translateY: this.data.translateY + (prevOffset.y - nextOffset.y) * this.data.scale
       });
     }
   },
@@ -685,6 +771,7 @@ Page({
   // ---------- 触摸事件 ----------
 
   touchstart(e) {
+    if (!this.context) return;
     const touches = e.touches;
     if (touches.length === 1) {
       const touch = touches[0];
@@ -728,10 +815,10 @@ Page({
         lineWidth = 20;
       }
 
-      this.context.setStrokeStyle(tinct);
-      this.context.setLineWidth(lineWidth);
-      this.context.setLineCap('round');
-      this.context.setLineJoin('round');
+      setStrokeStyleCompat(this.context, tinct);
+      setLineWidthCompat(this.context, lineWidth);
+      setLineCapCompat(this.context, 'round');
+      setLineJoinCompat(this.context, 'round');
 
       const canvasPos = this.screenToCanvas(touch.x, touch.y);
       this.expandCanvasBounds(canvasPos.x, canvasPos.y);
@@ -762,6 +849,7 @@ Page({
   },
 
   touchMove(e) {
+    if (!this.context) return;
     const touches = e.touches;
     if (this.data.currentMode === 'select' && this.data.isDraggingObject && touches.length === 1 && this.data.activeObjectId) {
       const touch = touches[0];
@@ -839,6 +927,7 @@ Page({
   },
 
   touchEnd() {
+    if (!this.context) return;
     const changed = this.data.isDrawing || this.data.isDraggingObject;
     this.setData({
       isDrawing: false,
@@ -856,9 +945,14 @@ Page({
 
   bindDraw(points) {
     if (!points || points.length < 1) return;
+    this.syncMainCanvasSize();
+    const offset = this.getCanvasContentOffset();
     this.context.save();
     this.context.scale(this.data.scale, this.data.scale);
-    this.context.translate(this.data.translateX / this.data.scale, this.data.translateY / this.data.scale);
+    this.context.translate(
+      this.data.translateX / this.data.scale + offset.x,
+      this.data.translateY / this.data.scale + offset.y
+    );
     this.context.beginPath();
     this.context.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) {
@@ -866,23 +960,25 @@ Page({
     }
     this.context.stroke();
     this.context.restore();
-    this.context.draw(true);
+    flushCanvasCompat(this.context, true);
   },
 
-  renderToContext(ctx, width, height, scale, tx, ty, isExport) {
+  renderToContext(ctx, width, height, scale, tx, ty, isExport, contentOffset) {
+    const offsetX = contentOffset && typeof contentOffset.x === 'number' ? contentOffset.x : 0;
+    const offsetY = contentOffset && typeof contentOffset.y === 'number' ? contentOffset.y : 0;
     ctx.clearRect(0, 0, width, height);
     if (isExport) {
-      ctx.setFillStyle('#ffffff');
+      setFillStyleCompat(ctx, '#ffffff');
       ctx.fillRect(0, 0, width, height);
     }
     ctx.save();
     ctx.scale(scale, scale);
-    ctx.translate(tx / scale, ty / scale);
+    ctx.translate(tx / scale + offsetX, ty / scale + offsetY);
     const objects = this.data.graphObjects;
     if (!isExport) {
       const buffer = 100;
-      const vX = -tx / scale - buffer;
-      const vY = -ty / scale - buffer;
+      const vX = -tx / scale - offsetX - buffer;
+      const vY = -ty / scale - offsetY - buffer;
       const vW = (width / scale) + buffer * 2;
       const vH = (height / scale) + buffer * 2;
       for (let i = 0; i < objects.length; i++) {
@@ -904,6 +1000,9 @@ Page({
   },
 
   redrawCanvas() {
+    if (!this.context) return;
+    this.syncMainCanvasSize();
+    const offset = this.getCanvasContentOffset();
     this.renderToContext(
       this.context,
       this.data.canvasWidth,
@@ -911,18 +1010,19 @@ Page({
       this.data.scale,
       this.data.translateX,
       this.data.translateY,
-      false
+      false,
+      offset
     );
-    this.context.draw();
+    flushCanvasCompat(this.context, false);
   },
 
   drawObject(ctx, obj, hideSelection) {
     if (obj.type === 'path') {
       if (obj.points.length > 0) {
-        ctx.setStrokeStyle(obj.style.color);
-        ctx.setLineWidth(obj.style.width);
-        ctx.setLineCap('round');
-        ctx.setLineJoin('round');
+        setStrokeStyleCompat(ctx, obj.style.color);
+        setLineWidthCompat(ctx, obj.style.width);
+        setLineCapCompat(ctx, 'round');
+        setLineJoinCompat(ctx, 'round');
         ctx.beginPath();
         ctx.moveTo(obj.points[0].x + (obj.x || 0), obj.points[0].y + (obj.y || 0));
         for (let j = 1; j < obj.points.length; j++) {
@@ -935,8 +1035,8 @@ Page({
     }
 
     if (!hideSelection && this.data.activeObjectId === obj.id) {
-      ctx.setStrokeStyle('#2563EB');
-      ctx.setLineWidth(2);
+      setStrokeStyleCompat(ctx, '#2563EB');
+      setLineWidthCompat(ctx, 2);
       const box = obj.itemBox;
       const finalX = box.minX + (obj.x || 0);
       const finalY = box.minY + (obj.y || 0);
@@ -1006,8 +1106,7 @@ Page({
   },
 
   doClearCanvas() {
-    this.context.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
-    this.context.draw();
+    this.clearMainCanvas();
     this.setData({
       graphObjects: [],
       activeObjectId: null,
@@ -1100,7 +1199,7 @@ Page({
     }, () => {
       wx.showLoading({ title: '导出中...', mask: true });
       const exportCtx = wx.createCanvasContext('exportCanvas', this);
-      this.renderToContext(exportCtx, exportWidth, exportHeight, renderScale, tx, ty, true);
+      this.renderToContext(exportCtx, exportWidth, exportHeight, renderScale, tx, ty, true, { x: 0, y: 0 });
       exportCtx.draw(true, () => {
         wx.canvasToTempFilePath({
           canvasId: 'exportCanvas',
@@ -1248,7 +1347,7 @@ Page({
 
     this.setData({ exportWidth: thumbSize, exportHeight: thumbSize }, () => {
       const exportCtx = wx.createCanvasContext('exportCanvas', this);
-      this.renderToContext(exportCtx, thumbSize, thumbSize, scale, tx, ty, true);
+      this.renderToContext(exportCtx, thumbSize, thumbSize, scale, tx, ty, true, { x: 0, y: 0 });
       exportCtx.draw(true, () => {
         wx.canvasToTempFilePath({
           canvasId: 'exportCanvas',

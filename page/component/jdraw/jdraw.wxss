@@ -1,41 +1,48 @@
 page {
-  background: #F3F4F6;
+  background: #FFFFFF;
   height: 100%;
 }
 
 .jdraw {
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 24rpx 24rpx 200rpx;
+  position: relative;
   box-sizing: border-box;
-  background: #F3F4F6;
+  overflow: hidden;
+  background: #FFFFFF;
 }
 
 /* ===== 顶部工具栏 ===== */
 .toolbar {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 20rpx);
+  left: 20rpx;
+  right: 20rpx;
+  z-index: 90;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16rpx 12rpx;
-  background: #FFFFFF;
-  border-radius: 20rpx;
-  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.04);
+  padding: 14rpx 10rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 24rpx;
+  box-shadow:
+    0 18rpx 36rpx rgba(15, 23, 42, 0.10),
+    0 4rpx 12rpx rgba(15, 23, 42, 0.06);
 }
 
 .tool {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6rpx;
-  padding: 12rpx 4rpx;
-  border-radius: 16rpx;
+  padding: 10rpx 2rpx;
+  border-radius: 18rpx;
   color: #1F2937;
 }
 
 .tool.active {
-  background: #F3F4F6;
+  background: rgba(243, 244, 246, 0.92);
 }
 
 .tool.active .tool-label {
@@ -44,8 +51,9 @@ page {
 }
 
 .tool-label {
-  font-size: 22rpx;
+  font-size: 20rpx;
   color: #4B5563;
+  line-height: 1;
 }
 
 .tool-icon {
@@ -799,13 +807,10 @@ page {
 
 /* ===== 画布 ===== */
 .canvas-wrap {
-  flex: 1;
-  min-height: 0;
-  margin-top: 20rpx;
-  padding: 8rpx;
+  position: absolute;
+  inset: 0;
+  padding: 0;
   background: #FFFFFF;
-  border-radius: 20rpx;
-  box-shadow: 0 4rpx 12rpx rgba(15, 23, 42, 0.04);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -814,12 +819,14 @@ page {
   width: 100%;
   height: 100%;
   position: relative;
-  border-radius: 14rpx;
   overflow: hidden;
-  background-color: #FFFFFF;
+  background: #FFFFFF;
 }
 
 .canvas-grid {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: block;
 }
 
