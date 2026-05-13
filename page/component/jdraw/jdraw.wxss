@@ -388,8 +388,7 @@ page {
       #ef4444, #f97316, #eab308, #22c55e,
       #06b6d4, #3b82f6, #8b5cf6, #ec4899, #ef4444
     );
-  box-shadow: 0 0 0 3rpx rgba(17, 24, 39, 0.8),
-    0 4rpx 10rpx rgba(17, 24, 39, 0.25);
+  box-shadow: 0 4rpx 10rpx rgba(17, 24, 39, 0.25);
   position: relative;
   z-index: 2;
 }
