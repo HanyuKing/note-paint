@@ -83,8 +83,17 @@
     </view>
   </view>
 
-  <view wx:if="{{showColorPicker}}" class="picker-mask" bindtap="closeColorPicker">
-    <view class="picker-panel" catchtap="stopPropagation">
+  <view
+    wx:if="{{showColorPicker}}"
+    class="picker-mask"
+    bindtap="closeColorPicker"
+    catchtouchmove="stopPropagation"
+  >
+    <view
+      class="picker-panel"
+      catchtap="stopPropagation"
+      catchtouchmove="stopPropagation"
+    >
       <view class="picker-head">
         <view class="picker-title">选择颜色</view>
         <view class="picker-close" bindtap="closeColorPicker">×</view>
@@ -105,6 +114,8 @@
             class="picker-grid-cell {{pickerHex === cell.hex ? 'picker-grid-cell-active' : ''}}"
             style="background-color: {{cell.color}};"
             data-color="{{cell.color}}"
+            data-spectrum-x="{{cell.spectrumX}}"
+            data-spectrum-y="{{cell.spectrumY}}"
             bindtap="onGridColorPick"
           ></view>
         </view>
@@ -226,9 +237,11 @@
   <view class="canvas-wrap">
     <view class="canvas-stage">
       <canvas
+        id="palette"
         class="canvas-grid"
         style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
         canvas-id="palette"
+        type="2d"
         bindtouchstart="touchstart"
         bindtouchmove="touchMove"
         bindtouchend="touchEnd"

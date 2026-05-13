@@ -176,21 +176,6 @@ function rgbToHsv(r, g, b) {
   };
 }
 
-function spectrumPointFromHsv(hsv) {
-  const x = clamp01(1 - hsv.v);
-  const y = hsv.s > 0.01 ? clamp01(hsv.h / 360) : 0;
-  return {
-    x: sliderThumbLinePct(x, 1),
-    y: sliderThumbLinePct(y, 1)
-  };
-}
-
-function spectrumRgbFromPoint(x, y) {
-  const nx = clamp01(x);
-  const ny = clamp01(y);
-  return hsvToRgb(ny * 360, 1, 1 - nx);
-}
-
 function buildColorGrid() {
   const rows = [];
   const columns = 12;
@@ -198,7 +183,8 @@ function buildColorGrid() {
   for (let c = 0; c < columns; c++) {
     const v = Math.round(255 - (255 * c / (columns - 1)));
     const color = rgbToHex(v, v, v);
-    grayRow.push({ color, hex: color.slice(1).toUpperCase() });
+    const x = grayValueToSpectrumX(v / 255);
+    grayRow.push({ color, hex: color.slice(1).toUpperCase(), spectrumX: sliderThumbLinePct(x, 1), spectrumY: 0 });
   }
   rows.push({ id: 'gray', cells: grayRow });
   for (let r = 0; r < 8; r++) {
@@ -208,12 +194,75 @@ function buildColorGrid() {
       const hue = (c / columns) * 360;
       const rgb = hsvToRgb(hue, 1, value);
       const color = rgbToHex(rgb.r, rgb.g, rgb.b);
-      row.push({ color, hex: color.slice(1).toUpperCase() });
+      const x = valueToSpectrumX(value);
+      const y = hueToSpectrumY(hue);
+      row.push({ color, hex: color.slice(1).toUpperCase(), spectrumX: sliderThumbLinePct(x, 1), spectrumY: sliderThumbLinePct(y, 1) });
     }
     rows.push({ id: 'hue-' + r, cells: row });
   }
   return rows;
 }
+
+const SPECTRUM_GRAY_EDGE_RATIO = 1 / 90;
+const SPECTRUM_PURE_X = 0.56;
+
+function grayValueToSpectrumX(value) {
+  return 1 - clamp01(value);
+}
+
+function valueToSpectrumX(value) {
+  const v = clamp01(value);
+  return SPECTRUM_PURE_X + (1 - v) * (1 - SPECTRUM_PURE_X);
+}
+
+function spectrumXToValue(x) {
+  const nx = clamp01(x);
+  if (nx <= SPECTRUM_PURE_X) return 1;
+  return 1 - ((nx - SPECTRUM_PURE_X) / (1 - SPECTRUM_PURE_X));
+}
+
+function hueToSpectrumY(hue) {
+  const h = ((hue % 360) + 360) % 360;
+  const colorY = h === 0 ? 1 : h / 360;
+  return SPECTRUM_GRAY_EDGE_RATIO + colorY * (1 - SPECTRUM_GRAY_EDGE_RATIO);
+}
+
+function spectrumRgbFromPoint(x, y) {
+  const nx = clamp01(x);
+  const ny = clamp01(y);
+  if (ny <= SPECTRUM_GRAY_EDGE_RATIO) {
+    const v = Math.round(255 * (1 - nx));
+    return { r: v, g: v, b: v };
+  }
+
+  const colorY = clamp01((ny - SPECTRUM_GRAY_EDGE_RATIO) / (1 - SPECTRUM_GRAY_EDGE_RATIO));
+  const hue = colorY * 360;
+  const saturation = nx <= SPECTRUM_PURE_X ? nx / SPECTRUM_PURE_X : 1;
+  const value = spectrumXToValue(nx);
+  return hsvToRgb(hue, saturation, value);
+}
+
+function spectrumPointFromRgb(rgb) {
+  const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+  if (rgb.r === rgb.g && rgb.g === rgb.b) {
+    const x = grayValueToSpectrumX(rgb.r / 255);
+    return {
+      x: sliderThumbLinePct(x, 1),
+      y: 0
+    };
+  }
+
+  const baseX = valueToSpectrumX(hsv.v);
+  const x = hsv.s < 0.999 && hsv.v > 0.99 ? hsv.s * SPECTRUM_PURE_X : baseX;
+  const y = hueToSpectrumY(hsv.h);
+
+  return {
+    x: sliderThumbLinePct(x, 1),
+    y: sliderThumbLinePct(y, 1)
+  };
+}
+
+const PICKER_GRID_ROWS = buildColorGrid();
 
 Page({
   data: {
@@ -250,8 +299,6 @@ Page({
 
     showColorPicker: false,
     pickerTab: 'grid',
-    pickerHue: 0,
-    pickerLight: 50,
     pickerColor: '#000000',
     pickerHex: '000000',
     pickerRed: 0,
@@ -264,7 +311,7 @@ Page({
     pickerGreenThumbPct: 0,
     pickerBlueThumbPct: 0,
     pickerAlphaThumbPct: 100,
-    pickerGrid: buildColorGrid(),
+    pickerGrid: PICKER_GRID_ROWS,
 
     canvasWidth: 800,
     canvasHeight: 1000,
@@ -547,8 +594,7 @@ Page({
     const g = Math.max(0, Math.min(255, Math.round(rgb.g)));
     const b = Math.max(0, Math.min(255, Math.round(rgb.b)));
     const alpha = typeof rgb.a === 'number' ? Math.max(0, Math.min(100, Math.round(rgb.a))) : this.data.pickerAlpha;
-    const hsv = rgbToHsv(r, g, b);
-    const spectrumPoint = spectrumPointFromHsv(hsv);
+    const spectrumPoint = spectrumPointFromRgb({ r, g, b });
     return Object.assign({
       pickerColor: this.buildPickerColor(r, g, b, alpha),
       pickerHex: rgbToHex(r, g, b).slice(1).toUpperCase(),
@@ -556,8 +602,6 @@ Page({
       pickerGreen: g,
       pickerBlue: b,
       pickerAlpha: alpha,
-      pickerHue: hsv.h,
-      pickerLight: Math.round(hsv.v * 100),
       pickerSpectrumX: spectrumPoint.x,
       pickerSpectrumY: spectrumPoint.y,
       pickerRedThumbPct: sliderThumbLinePct(r, 255),
@@ -589,7 +633,14 @@ Page({
     const color = e.currentTarget.dataset.color;
     if (!color) return;
     const rgb = hexToRgb(color);
-    this.commitPickerColor({ r: rgb.r, g: rgb.g, b: rgb.b, a: this.data.pickerAlpha });
+    const extraData = {};
+    const spectrumX = Number(e.currentTarget.dataset.spectrumX);
+    const spectrumY = Number(e.currentTarget.dataset.spectrumY);
+    if (Number.isFinite(spectrumX) && Number.isFinite(spectrumY)) {
+      extraData.pickerSpectrumX = spectrumX;
+      extraData.pickerSpectrumY = spectrumY;
+    }
+    this.commitPickerColor({ r: rgb.r, g: rgb.g, b: rgb.b, a: this.data.pickerAlpha }, extraData);
   },
 
   updateSpectrumFromTouch(e, shouldCommit) {
@@ -604,7 +655,10 @@ Page({
         const ny = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
         const rgb = spectrumRgbFromPoint(nx, ny);
         const next = { r: rgb.r, g: rgb.g, b: rgb.b, a: this.data.pickerAlpha };
-        this.commitPickerColor(next);
+        this.commitPickerColor(next, {
+          pickerSpectrumX: sliderThumbLinePct(nx, 1),
+          pickerSpectrumY: sliderThumbLinePct(ny, 1)
+        });
       })
       .exec();
   },
@@ -771,6 +825,7 @@ Page({
   // ---------- 触摸事件 ----------
 
   touchstart(e) {
+    if (this.data.showColorPicker || this.data.showTutorial) return;
     if (!this.context) return;
     const touches = e.touches;
     if (touches.length === 1) {
@@ -849,6 +904,7 @@ Page({
   },
 
   touchMove(e) {
+    if (this.data.showColorPicker || this.data.showTutorial) return;
     if (!this.context) return;
     const touches = e.touches;
     if (this.data.currentMode === 'select' && this.data.isDraggingObject && touches.length === 1 && this.data.activeObjectId) {
@@ -927,6 +983,7 @@ Page({
   },
 
   touchEnd() {
+    if (this.data.showColorPicker || this.data.showTutorial) return;
     if (!this.context) return;
     const changed = this.data.isDrawing || this.data.isDraggingObject;
     this.setData({

@@ -579,15 +579,15 @@ page {
   border-radius: 12rpx;
   box-sizing: border-box;
   background:
-    linear-gradient(to right, rgba(0, 0, 0, 0), #000000),
+    linear-gradient(to right, #FFFFFF 0%, rgba(255, 255, 255, 0) 56%, #000000 100%),
     linear-gradient(
       to bottom,
       #FF0000 0%,
-      #FFFF00 25%,
-      #00FF00 40%,
-      #00FFFF 55%,
-      #0000FF 70%,
-      #FF00FF 85%,
+      #FFFF00 16.7%,
+      #00FF00 33.4%,
+      #00FFFF 50%,
+      #0000FF 66.7%,
+      #FF00FF 83.4%,
       #FF0000 100%
     );
 }
