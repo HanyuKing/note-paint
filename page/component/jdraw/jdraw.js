@@ -349,7 +349,7 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({
         selected: 0,
-        hidden: !!(this.data.showTutorial || this.data.showColorPicker)
+        hidden: !!this.data.showColorPicker
       });
     }
     this.consumePendingFileId(false);
@@ -758,7 +758,7 @@ Page({
   },
 
   openTutorial() {
-    this.setTabBarHidden(true);
+    this.setTabBarHidden(false);
     this.setData({ showTutorial: true });
   },
 

@@ -22,11 +22,11 @@ page {
   align-items: center;
   justify-content: space-between;
   padding: 14rpx 10rpx;
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.78);
   border-radius: 24rpx;
   box-shadow:
-    0 18rpx 36rpx rgba(15, 23, 42, 0.10),
-    0 4rpx 12rpx rgba(15, 23, 42, 0.06);
+    0 18rpx 36rpx rgba(15, 23, 42, 0.08),
+    0 4rpx 12rpx rgba(15, 23, 42, 0.04);
 }
 
 .tool {
@@ -42,7 +42,7 @@ page {
 }
 
 .tool.active {
-  background: rgba(243, 244, 246, 0.92);
+  background: rgba(255, 255, 255, 0.52);
 }
 
 .tool.active .tool-label {
@@ -316,15 +316,15 @@ page {
   left: 24rpx;
   right: 24rpx;
   bottom: calc(140rpx + env(safe-area-inset-bottom));
-  background: #FFFFFF;
+  background: rgba(255, 255, 255, 0.78);
   border-radius: 28rpx;
   padding: 20rpx 24rpx 24rpx;
   display: flex;
   flex-direction: column;
   gap: 16rpx;
   box-shadow:
-    0 24rpx 48rpx rgba(17, 24, 39, 0.10),
-    0 4rpx 12rpx rgba(17, 24, 39, 0.04);
+    0 18rpx 36rpx rgba(15, 23, 42, 0.08),
+    0 4rpx 12rpx rgba(15, 23, 42, 0.04);
   z-index: 80;
   animation: paletteIn 0.18s ease-out;
 }
@@ -855,12 +855,15 @@ page {
 /* ===== 教程弹窗 ===== */
 .tutorial-overlay {
   position: fixed;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: calc(120rpx + env(safe-area-inset-bottom));
   z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 60rpx calc(120rpx + env(safe-area-inset-bottom));
+  padding: 0 60rpx;
   background: rgba(17, 24, 39, 0.55);
   box-sizing: border-box;
 }
