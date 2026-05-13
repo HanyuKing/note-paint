@@ -86,62 +86,139 @@
   <view wx:if="{{showColorPicker}}" class="picker-mask" bindtap="closeColorPicker">
     <view class="picker-panel" catchtap="stopPropagation">
       <view class="picker-head">
-        <view class="picker-cancel" bindtap="closeColorPicker">取消</view>
         <view class="picker-title">选择颜色</view>
-        <view class="picker-done" bindtap="confirmCustomColor">完成</view>
+        <view class="picker-close" bindtap="closeColorPicker">×</view>
       </view>
 
-      <view class="picker-preview-row">
+      <view class="picker-tabs">
+        <view class="picker-tab {{pickerTab==='grid' ? 'picker-tab-active' : ''}}" data-tab="grid" bindtap="switchPickerTab">网格</view>
+        <view class="picker-tab {{pickerTab==='spectrum' ? 'picker-tab-active' : ''}}" data-tab="spectrum" bindtap="switchPickerTab">光谱</view>
+        <view class="picker-tab {{pickerTab==='slider' ? 'picker-tab-active' : ''}}" data-tab="slider" bindtap="switchPickerTab">滑块</view>
+      </view>
+
+      <view wx:if="{{pickerTab==='grid'}}" class="picker-grid-board">
+        <view wx:for="{{pickerGrid}}" wx:for-item="row" wx:key="id" class="picker-grid-row">
+          <view
+            wx:for="{{row.cells}}"
+            wx:for-item="cell"
+            wx:key="color"
+            class="picker-grid-cell {{pickerHex === cell.hex ? 'picker-grid-cell-active' : ''}}"
+            style="background-color: {{cell.color}};"
+            data-color="{{cell.color}}"
+            bindtap="onGridColorPick"
+          ></view>
+        </view>
+      </view>
+
+      <view wx:elif="{{pickerTab==='spectrum'}}" class="spectrum-shell">
+        <view class="spectrum-zone">
+          <view
+            class="spectrum-gradient spectrum-touch-target"
+            bindtouchstart="onSpectrumPick"
+            bindtouchmove="onSpectrumPick"
+            bindtouchend="onSpectrumCommit"
+          ></view>
+          <view class="picker-thumb-ring" style="left: {{pickerSpectrumX}}%; top: {{pickerSpectrumY}}%;">
+            <view class="picker-thumb-fill" style="background-color: {{pickerColor}};"></view>
+          </view>
+        </view>
+      </view>
+
+      <view wx:else class="rgb-panel">
+        <view class="rgb-row">
+          <view class="picker-label">红色</view>
+          <view
+            class="rgb-slider-wrap picker-slider-hit"
+            data-track-id="pickerTrackR"
+            data-channel="r"
+            data-max="255"
+            bindtouchstart="onPickerSliderTouch"
+            bindtouchmove="onPickerSliderTouch"
+            bindtouchend="onPickerSliderTouch"
+          >
+            <view id="pickerTrackR" class="slider-strip red-strip">
+              <view class="slider-thumb-lane">
+                <view class="slider-thumb-rect picker-thumb-ring" style="left: {{pickerRedThumbPct}}%;">
+                  <view class="picker-thumb-fill" style="background-color: {{pickerColor}};"></view>
+                </view>
+              </view>
+            </view>
+          </view>
+          <input class="rgb-input" value="{{pickerRed}}" disabled />
+        </view>
+        <view class="rgb-row">
+          <view class="picker-label">绿色</view>
+          <view
+            class="rgb-slider-wrap picker-slider-hit"
+            data-track-id="pickerTrackG"
+            data-channel="g"
+            data-max="255"
+            bindtouchstart="onPickerSliderTouch"
+            bindtouchmove="onPickerSliderTouch"
+            bindtouchend="onPickerSliderTouch"
+          >
+            <view id="pickerTrackG" class="slider-strip green-strip">
+              <view class="slider-thumb-lane">
+                <view class="slider-thumb-rect picker-thumb-ring" style="left: {{pickerGreenThumbPct}}%;">
+                  <view class="picker-thumb-fill" style="background-color: {{pickerColor}};"></view>
+                </view>
+              </view>
+            </view>
+          </view>
+          <input class="rgb-input" value="{{pickerGreen}}" disabled />
+        </view>
+        <view class="rgb-row">
+          <view class="picker-label">蓝色</view>
+          <view
+            class="rgb-slider-wrap picker-slider-hit"
+            data-track-id="pickerTrackB"
+            data-channel="b"
+            data-max="255"
+            bindtouchstart="onPickerSliderTouch"
+            bindtouchmove="onPickerSliderTouch"
+            bindtouchend="onPickerSliderTouch"
+          >
+            <view id="pickerTrackB" class="slider-strip blue-strip">
+              <view class="slider-thumb-lane">
+                <view class="slider-thumb-rect picker-thumb-ring" style="left: {{pickerBlueThumbPct}}%;">
+                  <view class="picker-thumb-fill" style="background-color: {{pickerColor}};"></view>
+                </view>
+              </view>
+            </view>
+          </view>
+          <input class="rgb-input" value="{{pickerBlue}}" disabled />
+        </view>
+        <view class="hex-row">
+          <view class="hex-label">sRGB Hex 颜色#</view>
+          <input class="hex-input" value="{{pickerHex}}" maxlength="6" bindinput="onHexInput" />
+        </view>
+      </view>
+
+      <view class="alpha-wrap">
+        <view class="picker-label">不透明度</view>
+        <view class="alpha-row">
+          <view
+            class="alpha-slider-wrap picker-slider-hit"
+            data-track-id="pickerTrackAlpha"
+            data-channel="a"
+            data-max="100"
+            bindtouchstart="onPickerSliderTouch"
+            bindtouchmove="onPickerSliderTouch"
+            bindtouchend="onPickerSliderTouch"
+          >
+            <view id="pickerTrackAlpha" class="slider-strip alpha-strip">
+              <view class="slider-thumb-lane">
+                <view class="slider-thumb-rect picker-thumb-ring" style="left: {{pickerAlphaThumbPct}}%;">
+                  <view class="picker-thumb-fill" style="background-color: {{pickerColor}};"></view>
+                </view>
+              </view>
+            </view>
+          </view>
+          <view class="alpha-value">{{pickerAlpha}}%</view>
+        </view>
+      </view>
+      <view class="picker-bottom">
         <view class="picker-preview-dot" style="background-color: {{pickerColor}};"></view>
-        <view class="picker-hex">{{pickerColor}}</view>
-      </view>
-
-      <view class="picker-bar-wrap">
-        <view class="picker-label">色相</view>
-        <view class="hue-track">
-          <view class="hue-strip"></view>
-          <slider
-            class="hue-slider"
-            value="{{pickerHue}}"
-            min="0"
-            max="359"
-            bindchanging="onHueChange"
-            bindchange="onHueChange"
-            block-color="#FFFFFF"
-            block-size="24"
-            activeColor="rgba(0,0,0,0)"
-            backgroundColor="rgba(0,0,0,0)"
-          />
-        </view>
-      </view>
-
-      <view class="picker-bar-wrap">
-        <view class="picker-label">明度</view>
-        <slider
-          class="picker-slider"
-          value="{{pickerLight}}"
-          min="10"
-          max="90"
-          bindchanging="onLightChange"
-          bindchange="onLightChange"
-          block-color="#FFFFFF"
-          block-size="24"
-          activeColor="#111827"
-          backgroundColor="#E5E7EB"
-        />
-      </view>
-
-      <view class="picker-presets-title">常用预设</view>
-      <view class="picker-presets">
-        <view
-          wx:for="{{tinctList}}"
-          wx:key="*this"
-          class="color-item {{pickerColor===item ? 'color-item-active' : ''}}"
-          data-color="{{item}}"
-          bindtap="onPresetPick"
-        >
-          <view class="color-dot" style="background-color:{{item}}"></view>
-        </view>
       </view>
     </view>
   </view>

@@ -47,6 +47,117 @@ function hexToHsl(hex) {
   };
 }
 
+function hexToRgb(hex) {
+  if (!hex || hex.charAt(0) !== '#') return { r: 0, g: 0, b: 0 };
+  let v = hex.slice(1);
+  if (v.length === 3) v = v.split('').map(c => c + c).join('');
+  if (v.length !== 6) return { r: 0, g: 0, b: 0 };
+  return {
+    r: parseInt(v.slice(0, 2), 16) || 0,
+    g: parseInt(v.slice(2, 4), 16) || 0,
+    b: parseInt(v.slice(4, 6), 16) || 0
+  };
+}
+
+function rgbToHex(r, g, b) {
+  return '#' + toHex(r) + toHex(g) + toHex(b);
+}
+
+/** 取值 0～max → thumb-lane（两端圆帽圆心之间）上 0%～100%，与 WXSS inset 同步 */
+function sliderThumbLinePct(value, maxVal) {
+  if (!maxVal) return 0;
+  const t = Math.max(0, Math.min(1, value / maxVal));
+  return Math.round(t * 1000) / 10;
+}
+
+function parseColor(value) {
+  if (!value) return { r: 0, g: 0, b: 0, a: 100 };
+  if (value.charAt(0) === '#') {
+    const rgb = hexToRgb(value);
+    return { r: rgb.r, g: rgb.g, b: rgb.b, a: 100 };
+  }
+  const match = /^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([.\d]+))?\)$/i.exec(value);
+  if (!match) return { r: 0, g: 0, b: 0, a: 100 };
+  return {
+    r: Number(match[1]),
+    g: Number(match[2]),
+    b: Number(match[3]),
+    a: match[4] ? Math.round(Number(match[4]) * 100) : 100
+  };
+}
+
+function hsvToRgb(h, s, v) {
+  const c = v * s;
+  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  const m = v - c;
+  let r1 = 0;
+  let g1 = 0;
+  let b1 = 0;
+  if (h < 60) {
+    r1 = c; g1 = x;
+  } else if (h < 120) {
+    r1 = x; g1 = c;
+  } else if (h < 180) {
+    g1 = c; b1 = x;
+  } else if (h < 240) {
+    g1 = x; b1 = c;
+  } else if (h < 300) {
+    r1 = x; b1 = c;
+  } else {
+    r1 = c; b1 = x;
+  }
+  return {
+    r: Math.round((r1 + m) * 255),
+    g: Math.round((g1 + m) * 255),
+    b: Math.round((b1 + m) * 255)
+  };
+}
+
+function rgbToHsv(r, g, b) {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = 60 * (((g - b) / d) % 6);
+    if (max === g) h = 60 * ((b - r) / d + 2);
+    if (max === b) h = 60 * ((r - g) / d + 4);
+  }
+  if (h < 0) h += 360;
+  return {
+    h: Math.round(h),
+    s: max === 0 ? 0 : d / max,
+    v: max
+  };
+}
+
+function buildColorGrid() {
+  const rows = [];
+  const columns = 12;
+  const grayRow = [];
+  for (let c = 0; c < columns; c++) {
+    const v = Math.round(255 - (255 * c / (columns - 1)));
+    const color = rgbToHex(v, v, v);
+    grayRow.push({ color, hex: color.slice(1).toUpperCase() });
+  }
+  rows.push({ id: 'gray', cells: grayRow });
+  for (let r = 0; r < 8; r++) {
+    const row = [];
+    const value = 0.35 + (r / 7) * 0.65;
+    for (let c = 0; c < columns; c++) {
+      const hue = (c / columns) * 360;
+      const rgb = hsvToRgb(hue, 1, value);
+      const color = rgbToHex(rgb.r, rgb.g, rgb.b);
+      row.push({ color, hex: color.slice(1).toUpperCase() });
+    }
+    rows.push({ id: 'hue-' + r, cells: row });
+  }
+  return rows;
+}
+
 Page({
   data: {
     graphObjects: [],
@@ -81,9 +192,22 @@ Page({
     customColor: '',
 
     showColorPicker: false,
+    pickerTab: 'grid',
     pickerHue: 0,
     pickerLight: 50,
     pickerColor: '#000000',
+    pickerHex: '000000',
+    pickerRed: 0,
+    pickerGreen: 0,
+    pickerBlue: 0,
+    pickerAlpha: 100,
+    pickerSpectrumX: 0,
+    pickerSpectrumY: 100,
+    pickerRedThumbPct: 0,
+    pickerGreenThumbPct: 0,
+    pickerBlueThumbPct: 0,
+    pickerAlphaThumbPct: 100,
+    pickerGrid: buildColorGrid(),
 
     canvasWidth: 800,
     canvasHeight: 1000,
@@ -305,17 +429,10 @@ Page({
 
   openColorPicker() {
     const current = this.getCurrentColor();
-    const hsl = hexToHsl(current);
-    let hue = hsl.h;
-    let light = hsl.l;
-    if (light < 20 || light > 80) light = 50;
-    const previewHex = hslToHex(hue, 80, light);
     this.setTabBarHidden(true);
-    this.setData({
+    this.applyPickerColor(parseColor(current), {
       showColorPicker: true,
-      pickerHue: hue,
-      pickerLight: light,
-      pickerColor: previewHex
+      pickerTab: 'grid'
     });
   },
 
@@ -324,27 +441,151 @@ Page({
     this.setData({ showColorPicker: false });
   },
 
-  onHueChange(e) {
-    const hue = Number(e.detail.value);
-    const hex = hslToHex(hue, 80, this.data.pickerLight);
-    this.setData({ pickerHue: hue, pickerColor: hex });
+  switchPickerTab(e) {
+    const tab = e.currentTarget.dataset.tab;
+    if (!tab) return;
+    this.setData({ pickerTab: tab });
   },
 
-  onLightChange(e) {
-    const light = Number(e.detail.value);
-    const hex = hslToHex(this.data.pickerHue, 80, light);
-    this.setData({ pickerLight: light, pickerColor: hex });
+  buildPickerColor(r, g, b, alpha) {
+    const a = Math.max(0, Math.min(100, Math.round(alpha)));
+    if (a >= 100) return rgbToHex(r, g, b);
+    return 'rgba(' + Math.round(r) + ', ' + Math.round(g) + ', ' + Math.round(b) + ', ' + (a / 100).toFixed(2) + ')';
+  },
+
+  buildPickerData(rgb, extraData) {
+    const r = Math.max(0, Math.min(255, Math.round(rgb.r)));
+    const g = Math.max(0, Math.min(255, Math.round(rgb.g)));
+    const b = Math.max(0, Math.min(255, Math.round(rgb.b)));
+    const alpha = typeof rgb.a === 'number' ? Math.max(0, Math.min(100, Math.round(rgb.a))) : this.data.pickerAlpha;
+    const hsv = rgbToHsv(r, g, b);
+    return Object.assign({
+      pickerColor: this.buildPickerColor(r, g, b, alpha),
+      pickerHex: rgbToHex(r, g, b).slice(1).toUpperCase(),
+      pickerRed: r,
+      pickerGreen: g,
+      pickerBlue: b,
+      pickerAlpha: alpha,
+      pickerHue: hsv.h,
+      pickerLight: Math.round(hsv.v * 100),
+      pickerSpectrumX: sliderThumbLinePct(1 - hsv.v, 1),
+      pickerSpectrumY: sliderThumbLinePct(hsv.s, 1),
+      pickerRedThumbPct: sliderThumbLinePct(r, 255),
+      pickerGreenThumbPct: sliderThumbLinePct(g, 255),
+      pickerBlueThumbPct: sliderThumbLinePct(b, 255),
+      pickerAlphaThumbPct: sliderThumbLinePct(alpha, 100)
+    }, extraData || {});
+  },
+
+  applyPickerColor(rgb, extraData) {
+    const data = this.buildPickerData(rgb, extraData);
+    this.setData(data);
+  },
+
+  commitPickerColor(rgb, extraData) {
+    const data = this.buildPickerData(rgb);
+    const color = data.pickerColor || '#000000';
+    const tinctList = this.data.tinctList || [];
+    const presetIndex = tinctList.indexOf(color);
+    this.setData(Object.assign(data, extraData || {}, {
+      customColor: presetIndex >= 0 ? '' : color,
+      tinctCurr: presetIndex >= 0 ? presetIndex : -1,
+      brushState: 'p',
+      currentMode: 'draw'
+    }));
+  },
+
+  onGridColorPick(e) {
+    const color = e.currentTarget.dataset.color;
+    if (!color) return;
+    const rgb = hexToRgb(color);
+    this.commitPickerColor({ r: rgb.r, g: rgb.g, b: rgb.b, a: this.data.pickerAlpha });
+  },
+
+  updateSpectrumFromTouch(e, shouldCommit) {
+    const touch = (e.touches && e.touches[0]) || e.changedTouches && e.changedTouches[0];
+    if (!touch) return;
+    wx.createSelectorQuery()
+      .in(this)
+      .select('.spectrum-touch-target')
+      .boundingClientRect(rect => {
+        if (!rect || !rect.width || !rect.height) return;
+        const nx = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+        const ny = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
+        /* 光谱相对水平布局逆时针转了 90°：屏幕横向对应原纵向(v)，屏幕纵向对应原横向(h/s) */
+        const xl = ny;
+        const yl = nx;
+        const rgb = hsvToRgb(xl * 360, xl, 1 - yl);
+        const next = { r: rgb.r, g: rgb.g, b: rgb.b, a: this.data.pickerAlpha };
+        this.commitPickerColor(next);
+      })
+      .exec();
+  },
+
+  onSpectrumPick(e) {
+    this.updateSpectrumFromTouch(e, false);
+  },
+
+  onSpectrumCommit(e) {
+    this.updateSpectrumFromTouch(e, true);
+  },
+
+  /** 触点映射：x 从左/右圆帽圆心算起，行程 length−height，与 thumb-lane 一致 */
+  onPickerSliderTouch(e) {
+    const touch = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
+    if (!touch) return;
+
+    const maxVal = Number(e.currentTarget.dataset.max);
+    const channel = e.currentTarget.dataset.channel;
+    const trackId = e.currentTarget.dataset.trackId;
+    if (!trackId || !channel || !Number.isFinite(maxVal)) return;
+
+    const queryId = '#' + trackId;
+
+    wx.createSelectorQuery()
+      .in(this)
+      .select(queryId)
+      .boundingClientRect(rect => {
+        if (!rect || !rect.width) return;
+
+        const capR = rect.height / 2;
+        const travel = Math.max(rect.width - 2 * capR, 1);
+        let x = touch.clientX - rect.left - capR;
+        let ratio = x / travel;
+        ratio = Math.max(0, Math.min(1, ratio));
+
+        let value = Math.round(ratio * maxVal);
+
+        const rgb = {
+          r: this.data.pickerRed,
+          g: this.data.pickerGreen,
+          b: this.data.pickerBlue,
+          a: this.data.pickerAlpha
+        };
+        if (channel === 'a') rgb.a = value;
+        else if (channel === 'r') rgb.r = value;
+        else if (channel === 'g') rgb.g = value;
+        else if (channel === 'b') rgb.b = value;
+
+        this.commitPickerColor(rgb);
+      })
+      .exec();
+  },
+
+  onHexInput(e) {
+    const value = (e.detail.value || '').replace(/[^0-9a-fA-F]/g, '').slice(0, 6).toUpperCase();
+    this.setData({ pickerHex: value });
+    if (value.length !== 6) return;
+    const rgb = hexToRgb('#' + value);
+    this.commitPickerColor({ r: rgb.r, g: rgb.g, b: rgb.b, a: this.data.pickerAlpha });
   },
 
   onPresetPick(e) {
     const color = e.currentTarget.dataset.color;
     if (!color) return;
-    const hsl = hexToHsl(color);
-    this.setData({
-      pickerColor: color,
-      pickerHue: hsl.h,
-      pickerLight: hsl.l < 10 ? 10 : (hsl.l > 90 ? 90 : hsl.l)
-    });
+    const rgb = parseColor(color);
+    rgb.a = this.data.pickerAlpha;
+    this.applyPickerColor(rgb);
   },
 
   confirmCustomColor() {
