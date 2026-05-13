@@ -296,6 +296,7 @@ Page({
     tinctCurr: 0,
     tinctSize: 3,
     customColor: '',
+    currentPenIconColor: '#000000',
 
     showColorPicker: false,
     pickerTab: 'grid',
@@ -470,6 +471,12 @@ Page({
       return;
     }
     const data = file.data || {};
+    const savedTinctCurr = typeof data.tinctCurr === 'number' ? data.tinctCurr : 0;
+    const savedCustomColor = data.customColor || '';
+    const savedTinctList = this.data.tinctList || [];
+    const savedPenColor = savedTinctCurr === -1 && savedCustomColor
+      ? savedCustomColor
+      : savedTinctList[savedTinctCurr] || savedTinctList[0] || '#000000';
     this.setData({
       currentFileId: file.id,
       fileName: file.name || '',
@@ -482,9 +489,10 @@ Page({
       translateX: data.translateX || 0,
       translateY: data.translateY || 0,
       brushState: data.brushState || 'p',
-      tinctCurr: typeof data.tinctCurr === 'number' ? data.tinctCurr : 0,
+      tinctCurr: savedTinctCurr,
       tinctSize: data.tinctSize || 3,
-      customColor: data.customColor || '',
+      customColor: savedCustomColor,
+      currentPenIconColor: this.getPenIconColor(savedPenColor),
       currentMode: data.currentMode || 'draw',
       activeObjectId: null
     }, () => {
@@ -509,7 +517,8 @@ Page({
       translateY: 0,
       activeObjectId: null,
       customColor: '',
-      tinctCurr: 0
+      tinctCurr: 0,
+      currentPenIconColor: this.getPenIconColor((this.data.tinctList || [])[0] || '#000000')
     });
     const app = getApp();
     if (app && app.globalData) app.globalData.currentEditingFileId = '';
@@ -552,6 +561,12 @@ Page({
     if (idx === -1 && this.data.customColor) return this.data.customColor;
     const colors = this.data.tinctList || [];
     return colors[idx] || colors[0] || '#000000';
+  },
+
+  getPenIconColor(color) {
+    const parsed = parseColor(color || '#000000');
+    if (parsed.a <= 0) return '#000000';
+    return rgbToHex(parsed.r, parsed.g, parsed.b);
   },
 
   // ---------- 任意颜色弹层 ----------
@@ -624,6 +639,7 @@ Page({
     this.setData(Object.assign(data, extraData || {}, {
       customColor: presetIndex >= 0 ? '' : color,
       tinctCurr: presetIndex >= 0 ? presetIndex : -1,
+      currentPenIconColor: this.getPenIconColor(color),
       brushState: 'p',
       currentMode: 'draw'
     }));
@@ -737,6 +753,7 @@ Page({
     this.setData({
       customColor: presetIndex >= 0 ? '' : color,
       tinctCurr: presetIndex >= 0 ? presetIndex : -1,
+      currentPenIconColor: this.getPenIconColor(color),
       brushState: 'p',
       currentMode: 'draw',
       showColorPicker: false
@@ -1121,9 +1138,11 @@ Page({
   },
 
   tinColorChange(e) {
+    const index = Number(e.currentTarget.dataset.index);
+    const color = (this.data.tinctList || [])[index] || '#000000';
     this.setData({
-      tinctCurr: Number(e.currentTarget.dataset.index),
-      customColor: '',
+      tinctCurr: index,
+      currentPenIconColor: this.getPenIconColor(color),
       brushState: 'p',
       currentMode: 'draw'
     });

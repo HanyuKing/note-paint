@@ -97,47 +97,55 @@ page {
   border-color: #111827;
 }
 
-/* 画笔: 倾斜的笔形 */
+/* 画笔: 圆圈笔尖 */
 .pen-icon {
   width: 44rpx;
   height: 44rpx;
+  color: #1F2937;
 }
 
 .pen-icon::before {
   content: '';
   position: absolute;
-  left: 6rpx;
-  bottom: 4rpx;
-  width: 36rpx;
-  height: 8rpx;
-  background: #1F2937;
-  border-radius: 4rpx;
-  transform: rotate(-45deg);
-  transform-origin: left bottom;
+  inset: 4rpx;
+  border: 4rpx solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
 }
 
-.pen-icon::after {
+.pen-tip {
+  position: absolute;
+  left: 50%;
+  top: 11rpx;
+  width: 20rpx;
+  height: 24rpx;
+  background: currentColor;
+  clip-path: polygon(50% 0, 84% 100%, 16% 100%);
+  transform: translateX(-50%);
+}
+
+.pen-tip::before {
   content: '';
   position: absolute;
-  left: 4rpx;
-  bottom: 4rpx;
-  width: 0;
-  height: 0;
-  border-left: 8rpx solid transparent;
-  border-right: 8rpx solid transparent;
-  border-top: 12rpx solid #1F2937;
-  transform: rotate(-45deg);
-  transform-origin: left bottom;
+  left: 50%;
+  top: 10rpx;
+  width: 4rpx;
+  height: 14rpx;
+  background: #FFFFFF;
+  border-radius: 2rpx;
+  transform: translateX(-50%);
 }
 
-.tool.active .pen-icon::before,
-.tool.active .pen-icon::after {
-  background: #111827;
-}
-
-.tool.active .pen-icon::after {
-  border-top-color: #111827;
-  background: transparent;
+.pen-tip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 6rpx;
+  width: 7rpx;
+  height: 7rpx;
+  border-radius: 50%;
+  background: #FFFFFF;
+  transform: translateX(-50%);
 }
 
 /* 橡皮: 倾斜的方块 */
@@ -401,10 +409,14 @@ page {
   z-index: 2;
 }
 
-.rainbow-active .rainbow-inner {
+.rainbow-active {
   box-shadow:
     0 0 0 3rpx #111827,
-    0 0 0 7rpx #FFFFFF,
+    0 0 0 7rpx #FFFFFF;
+}
+
+.rainbow-active .rainbow-inner {
+  box-shadow:
     0 4rpx 10rpx rgba(17, 24, 39, 0.25);
 }
 
