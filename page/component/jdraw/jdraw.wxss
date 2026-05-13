@@ -547,8 +547,7 @@ page {
 .spectrum-shell {
   height: 520rpx;
   box-sizing: border-box;
-  /* 圆心在选区四角时白环+阴影需占位，与手柄外径（约 52rpx）匹配 */
-  padding: 48rpx;
+  overflow: visible;
 }
 
 /* 渐变全区域可点（单独 overflow 裁圆角）；手柄百分比相对本层，translate 使圆心落在四边与四角 */
@@ -572,11 +571,18 @@ page {
   overflow: hidden;
   border-radius: 12rpx;
   box-sizing: border-box;
-  /* 相对原先布局逆时针旋转 90°：彩虹沿纵向，白从上缘，黑从右缘 */
   background:
     linear-gradient(to right, rgba(0, 0, 0, 0), #000000),
-    linear-gradient(to bottom, #FFFFFF, rgba(255, 255, 255, 0)),
-    linear-gradient(to bottom, #FF0000, #FFFF00, #00FF00, #00FFFF, #0000FF, #FF00FF, #FF0000);
+    linear-gradient(
+      to bottom,
+      #FF0000 0%,
+      #FFFF00 25%,
+      #00FF00 40%,
+      #00FFFF 55%,
+      #0000FF 70%,
+      #FF00FF 85%,
+      #FF0000 100%
+    );
 }
 
 /**

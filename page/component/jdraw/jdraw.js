@@ -63,6 +63,10 @@ function rgbToHex(r, g, b) {
   return '#' + toHex(r) + toHex(g) + toHex(b);
 }
 
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
 /** 取值 0～max → thumb-lane（两端圆帽圆心之间）上 0%～100%，与 WXSS inset 同步 */
 function sliderThumbLinePct(value, maxVal) {
   if (!maxVal) return 0;
@@ -132,6 +136,21 @@ function rgbToHsv(r, g, b) {
     s: max === 0 ? 0 : d / max,
     v: max
   };
+}
+
+function spectrumPointFromHsv(hsv) {
+  const x = clamp01(1 - hsv.v);
+  const y = hsv.s > 0.01 ? clamp01(hsv.h / 360) : 0;
+  return {
+    x: sliderThumbLinePct(x, 1),
+    y: sliderThumbLinePct(y, 1)
+  };
+}
+
+function spectrumRgbFromPoint(x, y) {
+  const nx = clamp01(x);
+  const ny = clamp01(y);
+  return hsvToRgb(ny * 360, 1, 1 - nx);
 }
 
 function buildColorGrid() {
@@ -459,6 +478,7 @@ Page({
     const b = Math.max(0, Math.min(255, Math.round(rgb.b)));
     const alpha = typeof rgb.a === 'number' ? Math.max(0, Math.min(100, Math.round(rgb.a))) : this.data.pickerAlpha;
     const hsv = rgbToHsv(r, g, b);
+    const spectrumPoint = spectrumPointFromHsv(hsv);
     return Object.assign({
       pickerColor: this.buildPickerColor(r, g, b, alpha),
       pickerHex: rgbToHex(r, g, b).slice(1).toUpperCase(),
@@ -468,8 +488,8 @@ Page({
       pickerAlpha: alpha,
       pickerHue: hsv.h,
       pickerLight: Math.round(hsv.v * 100),
-      pickerSpectrumX: sliderThumbLinePct(1 - hsv.v, 1),
-      pickerSpectrumY: sliderThumbLinePct(hsv.s, 1),
+      pickerSpectrumX: spectrumPoint.x,
+      pickerSpectrumY: spectrumPoint.y,
       pickerRedThumbPct: sliderThumbLinePct(r, 255),
       pickerGreenThumbPct: sliderThumbLinePct(g, 255),
       pickerBlueThumbPct: sliderThumbLinePct(b, 255),
@@ -512,10 +532,7 @@ Page({
         if (!rect || !rect.width || !rect.height) return;
         const nx = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
         const ny = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
-        /* 光谱相对水平布局逆时针转了 90°：屏幕横向对应原纵向(v)，屏幕纵向对应原横向(h/s) */
-        const xl = ny;
-        const yl = nx;
-        const rgb = hsvToRgb(xl * 360, xl, 1 - yl);
+        const rgb = spectrumRgbFromPoint(nx, ny);
         const next = { r: rgb.r, g: rgb.g, b: rgb.b, a: this.data.pickerAlpha };
         this.commitPickerColor(next);
       })
