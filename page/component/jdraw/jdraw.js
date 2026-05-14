@@ -322,6 +322,8 @@ Page({
 
     canvasWidth: 800,
     canvasHeight: 1000,
+    viewportWidth: 1,
+    viewportHeight: 1,
     scale: 1,
     translateX: 0,
     translateY: 0,
@@ -367,12 +369,24 @@ Page({
   onReady() {
     const sysInfo = wx.getSystemInfoSync();
     this.pixelRatio = sysInfo.pixelRatio || 1;
-    this.setData({
+    const screenWidth = sysInfo.windowWidth;
+    const screenHeight = sysInfo.windowHeight;
+    const shouldCenterDefaultBoard = !this.data.currentFileId &&
+      (!this.data.graphObjects || this.data.graphObjects.length === 0) &&
+      (this.data.translateX || 0) === 0 &&
+      (this.data.translateY || 0) === 0;
+    const viewState = shouldCenterDefaultBoard
+      ? this.getCenteredCanvasViewState(this.data.canvasWidth, this.data.canvasHeight, this.data.scale, screenWidth, screenHeight)
+      : {};
+    this.setData(Object.assign({
       screenWidth: sysInfo.windowWidth,
-      screenHeight: sysInfo.windowHeight
+      screenHeight: sysInfo.windowHeight,
+      viewportWidth: screenWidth,
+      viewportHeight: screenHeight
+    }, viewState), () => {
+      this.initMainCanvas();
+      this.checkFirstTimeUser();
     });
-    this.initMainCanvas();
-    this.checkFirstTimeUser();
   },
 
   initMainCanvas() {
@@ -394,10 +408,27 @@ Page({
       .exec();
   },
 
+  getCenteredCanvasViewState(canvasWidth, canvasHeight, scale, screenWidth, screenHeight) {
+    const nextScale = scale || 1;
+    let sysInfo = {};
+    if ((!screenWidth || !screenHeight) && typeof wx !== 'undefined' && wx.getSystemInfoSync) {
+      sysInfo = wx.getSystemInfoSync() || {};
+    }
+    const viewportWidth = screenWidth || this.data.screenWidth || sysInfo.windowWidth || 0;
+    const viewportHeight = screenHeight || this.data.screenHeight || sysInfo.windowHeight || 0;
+    const width = canvasWidth || this.data.canvasWidth || 800;
+    const height = canvasHeight || this.data.canvasHeight || 1000;
+    return {
+      scale: nextScale,
+      translateX: viewportWidth / 2 - (width * nextScale) / 2,
+      translateY: viewportHeight / 2 - (height * nextScale) / 2
+    };
+  },
+
   syncMainCanvasSize() {
     if (!this.mainCanvas || !this.context) return;
-    const width = Math.max(1, Math.round(this.data.canvasWidth || 1));
-    const height = Math.max(1, Math.round(this.data.canvasHeight || 1));
+    const width = Math.max(1, Math.round(this.data.viewportWidth || this.data.screenWidth || 1));
+    const height = Math.max(1, Math.round(this.data.viewportHeight || this.data.screenHeight || 1));
     const dpr = this.pixelRatio || 1;
     const realWidth = width * dpr;
     const realHeight = height * dpr;
@@ -411,7 +442,7 @@ Page({
   clearMainCanvas() {
     if (!this.context) return;
     this.syncMainCanvasSize();
-    this.context.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
+    this.context.clearRect(0, 0, this.data.viewportWidth, this.data.viewportHeight);
   },
 
   getImageDrawSource(src, callback) {
@@ -509,17 +540,33 @@ Page({
     const savedPenColor = savedTinctCurr === -1 && savedCustomColor
       ? savedCustomColor
       : savedTinctList[savedTinctCurr] || savedTinctList[0] || '#000000';
-    this.setData({
+    const graphObjects = data.graphObjects || [];
+    const canvasWidth = data.canvasWidth || 800;
+    const canvasHeight = data.canvasHeight || 1000;
+    const scale = data.scale || 1;
+    const hasSavedViewState = typeof data.translateX === 'number' && typeof data.translateY === 'number';
+    const isLegacyDefaultView = hasSavedViewState &&
+      canvasWidth === 800 &&
+      canvasHeight === 1000 &&
+      scale === 1 &&
+      data.translateX === 0 &&
+      data.translateY === 0;
+    const shouldCenterView = !hasSavedViewState || (isLegacyDefaultView && graphObjects.length === 0);
+    const viewState = shouldCenterView
+      ? this.getCenteredCanvasViewState(canvasWidth, canvasHeight, scale)
+      : {
+        scale,
+        translateX: data.translateX,
+        translateY: data.translateY
+      };
+    this.setData(Object.assign({
       currentFileId: file.id,
       fileName: file.name || '',
       hasChanges: false,
-      graphObjects: data.graphObjects || [],
+      graphObjects,
       canvasBounds: data.canvasBounds || { minX: 0, maxX: 800, minY: 0, maxY: 1000 },
-      canvasWidth: data.canvasWidth || 800,
-      canvasHeight: data.canvasHeight || 1000,
-      scale: data.scale || 1,
-      translateX: data.translateX || 0,
-      translateY: data.translateY || 0,
+      canvasWidth,
+      canvasHeight,
       brushState: data.brushState || 'p',
       tinctCurr: savedTinctCurr,
       tinctSize: data.tinctSize || 3,
@@ -527,7 +574,7 @@ Page({
       currentPenIconColor: this.getPenIconColor(savedPenColor),
       currentMode: data.currentMode || 'draw',
       activeObjectId: null
-    }, () => {
+    }, viewState), () => {
       const app = getApp();
       if (app && app.globalData) app.globalData.currentEditingFileId = file.id;
       if (this.context) this.redrawCanvas();
@@ -535,8 +582,9 @@ Page({
   },
 
   applyEmptyBoard() {
+    const viewState = this.getCenteredCanvasViewState(800, 1000, 1);
     this.clearMainCanvas();
-    this.setData({
+    this.setData(Object.assign({
       currentFileId: '',
       fileName: '',
       hasChanges: false,
@@ -544,14 +592,11 @@ Page({
       canvasBounds: { minX: 0, maxX: 800, minY: 0, maxY: 1000 },
       canvasWidth: 800,
       canvasHeight: 1000,
-      scale: 1,
-      translateX: 0,
-      translateY: 0,
       activeObjectId: null,
       customColor: '',
       tinctCurr: 0,
       currentPenIconColor: this.getPenIconColor((this.data.tinctList || [])[0] || '#000000')
-    });
+    }, viewState));
     const app = getApp();
     if (app && app.globalData) app.globalData.currentEditingFileId = '';
   },
@@ -872,7 +917,7 @@ Page({
     return Math.sqrt(dx * dx + dy * dy);
   },
 
-  expandCanvasBounds(x, y) {
+  expandCanvasBounds(x, y, deferSync) {
     const bounds = this.data.canvasBounds;
     const prevOffset = this.getCanvasContentOffset();
     let needUpdate = false;
@@ -886,14 +931,21 @@ Page({
         x: -(bounds.minX || 0),
         y: -(bounds.minY || 0)
       };
-      this.setData({
+      const nextData = {
         canvasBounds: bounds,
         canvasWidth: bounds.maxX - bounds.minX,
         canvasHeight: bounds.maxY - bounds.minY,
         translateX: this.data.translateX + (prevOffset.x - nextOffset.x) * this.data.scale,
         translateY: this.data.translateY + (prevOffset.y - nextOffset.y) * this.data.scale
-      });
+      };
+      Object.assign(this.data, nextData);
+      if (deferSync) {
+        this.pendingCanvasBoundsData = Object.assign({}, this.pendingCanvasBoundsData || {}, nextData);
+      } else {
+        this.setData(nextData);
+      }
     }
+    return needUpdate;
   },
 
   // ---------- 触摸事件 ----------
@@ -950,7 +1002,6 @@ Page({
       setLineJoinCompat(this.context, 'round');
 
       const canvasPos = this.screenToCanvas(touch.x, touch.y);
-      this.expandCanvasBounds(canvasPos.x, canvasPos.y);
       this.setData({ isDrawing: true });
 
       const newPath = {
@@ -965,6 +1016,7 @@ Page({
         }
       };
       this.data.graphObjects.push(newPath);
+      this.expandCanvasBounds(canvasPos.x, canvasPos.y, true);
     } else if (touches.length === 2) {
       const centerX = (touches[0].x + touches[1].x) / 2;
       const centerY = (touches[0].y + touches[1].y) / 2;
@@ -1000,7 +1052,6 @@ Page({
     if (this.data.isDrawing && touches.length === 1) {
       const touch = touches[0];
       const canvasPos = this.screenToCanvas(touch.x, touch.y);
-      this.expandCanvasBounds(canvasPos.x, canvasPos.y);
       const objects = this.data.graphObjects;
       const cur = objects[objects.length - 1];
       if (cur && cur.type === 'path') {
@@ -1013,7 +1064,8 @@ Page({
         cur.itemBox.maxX = Math.max(cur.itemBox.maxX, canvasPos.x);
         cur.itemBox.minY = Math.min(cur.itemBox.minY, canvasPos.y);
         cur.itemBox.maxY = Math.max(cur.itemBox.maxY, canvasPos.y);
-        this.bindDraw(cur.points);
+        this.expandCanvasBounds(canvasPos.x, canvasPos.y, true);
+        this.bindDraw(cur);
       }
     } else if (this.data.isZooming && touches.length === 2) {
       const currentDistance = this.getDistance(touches[0], touches[1]);
@@ -1060,7 +1112,9 @@ Page({
     if (this.data.showColorPicker || this.data.showTutorial) return;
     if (!this.context) return;
     const changed = this.data.isDrawing || this.data.isDraggingObject;
-    this.setData({
+    const pendingCanvasBoundsData = this.pendingCanvasBoundsData || {};
+    this.pendingCanvasBoundsData = null;
+    this.setData(Object.assign({}, pendingCanvasBoundsData, {
       isDrawing: false,
       isPanning: false,
       isZooming: false,
@@ -1068,17 +1122,24 @@ Page({
       lastPanPoint: null,
       lastTouchDistance: 0,
       showScaleToast: false
-    });
+    }));
     if (changed) this.markChanged();
   },
 
   // ---------- 绘制 ----------
 
-  bindDraw(points) {
+  bindDraw(path) {
+    const points = path && path.points;
     if (!points || points.length < 1) return;
     this.syncMainCanvasSize();
     const offset = this.getCanvasContentOffset();
     this.context.save();
+    if (path.style) {
+      setStrokeStyleCompat(this.context, path.style.color);
+      setLineWidthCompat(this.context, path.style.width);
+    }
+    setLineCapCompat(this.context, 'round');
+    setLineJoinCompat(this.context, 'round');
     this.context.scale(this.data.scale, this.data.scale);
     this.context.translate(
       this.data.translateX / this.data.scale + offset.x,
@@ -1138,8 +1199,8 @@ Page({
     const offset = this.getCanvasContentOffset();
     const asyncImageTasks = this.renderToContext(
       this.context,
-      this.data.canvasWidth,
-      this.data.canvasHeight,
+      this.data.viewportWidth,
+      this.data.viewportHeight,
       this.data.scale,
       this.data.translateX,
       this.data.translateY,
@@ -1264,17 +1325,15 @@ Page({
   },
 
   doClearCanvas() {
+    const viewState = this.getCenteredCanvasViewState(800, 1000, 1);
     this.clearMainCanvas();
-    this.setData({
+    this.setData(Object.assign({
       graphObjects: [],
       activeObjectId: null,
       canvasBounds: { minX: 0, maxX: 800, minY: 0, maxY: 1000 },
       canvasWidth: 800,
-      canvasHeight: 1000,
-      scale: 1,
-      translateX: 0,
-      translateY: 0
-    });
+      canvasHeight: 1000
+    }, viewState));
     this.markChanged();
   },
 

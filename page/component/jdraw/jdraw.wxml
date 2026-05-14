@@ -241,7 +241,7 @@
       <canvas
         id="palette"
         class="canvas-grid"
-        style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
+        style="width: {{viewportWidth}}px; height: {{viewportHeight}}px;"
         canvas-id="palette"
         type="2d"
         bindtouchstart="touchstart"
