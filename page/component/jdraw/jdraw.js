@@ -1,6 +1,7 @@
 const boardStore = require('../../../utils/boardStore');
 const fileUnlockStore = require('../../../utils/fileUnlockStore');
 const rewardedVideoAd = require('../../../utils/rewardedVideoAd');
+const share = require('../../../utils/share');
 const TUTORIAL_STORAGE_KEY = 'hasUsedNotePaint';
 const TUTORIAL_DOT_STORAGE_KEY = 'hasReadNotePaintTutorialDot';
 
@@ -354,6 +355,7 @@ Page({
   },
 
   onLoad() {
+    share.enableShareMenu();
     this.saveFileAd = rewardedVideoAd.createRewardedVideoAd(rewardedVideoAd.SAVE_FILE_AD_UNIT_ID, {
       cancelMessage: '完整观看广告后才能保存更多文件',
       errorMessage: '广告暂不可用，请稍后再试'
@@ -374,6 +376,14 @@ Page({
       });
     }
     this.consumePendingFileId(false);
+  },
+
+  onShareAppMessage() {
+    return share.getShareInfo();
+  },
+
+  onShareTimeline() {
+    return share.getTimelineInfo();
   },
 
   onUnload() {

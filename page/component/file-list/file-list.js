@@ -1,5 +1,6 @@
 const boardStore = require('../../../utils/boardStore');
 const rewardedVideoAd = require('../../../utils/rewardedVideoAd');
+const share = require('../../../utils/share');
 
 function setStrokeStyleCompat(ctx, value) {
   if (!ctx) return;
@@ -46,6 +47,7 @@ Page({
   },
 
   onLoad() {
+    share.enableShareMenu();
     this.exportImageAd = rewardedVideoAd.createRewardedVideoAd(rewardedVideoAd.EXPORT_IMAGE_AD_UNIT_ID, {
       cancelMessage: '完整观看广告后才能导出',
       errorMessage: '广告暂不可用，请稍后再试'
@@ -57,6 +59,14 @@ Page({
       this.getTabBar().setData({ selected: 1 });
     }
     this.refreshFiles();
+  },
+
+  onShareAppMessage() {
+    return share.getShareInfo();
+  },
+
+  onShareTimeline() {
+    return share.getTimelineInfo();
   },
 
   onUnload() {
