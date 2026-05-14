@@ -63,6 +63,11 @@
     </view>
   </view>
 
+  <canvas
+    style="width: {{exportWidth}}px; height: {{exportHeight}}px; position: fixed; left: 10000px; top: 0;"
+    canvas-id="exportCanvas"
+  ></canvas>
+
   <view class="fab" catchtap="createNewBoard" hover-class="fab-hover" hover-stay-time="80">
     <view class="fab-btn">
       <view class="fab-icon"></view>
