@@ -1,4 +1,3 @@
-const FILE_LIMIT = 3;
 const LIST_KEY = 'notePaintBoardFiles';
 const FILE_KEY_PREFIX = 'notePaintBoardFile:';
 
@@ -68,23 +67,9 @@ function getFile(id) {
   }
 }
 
-function canCreateFile(currentFileId) {
-  if (currentFileId) return true;
-  return getFiles().length < FILE_LIMIT;
-}
-
 function saveFile(payload) {
   const files = getFiles();
   const now = Date.now();
-  const isExisting = !!payload.id && files.some(item => item.id === payload.id);
-
-  if (!isExisting && files.length >= FILE_LIMIT) {
-    return {
-      ok: false,
-      reason: 'limit',
-      message: '开通会员后可保存更多文件'
-    };
-  }
 
   const id = payload.id || uuidv4();
   const existingMeta = files.find(item => item.id === id);
@@ -172,10 +157,8 @@ function deleteFile(id) {
 }
 
 module.exports = {
-  FILE_LIMIT,
   getFiles,
   getFile,
-  canCreateFile,
   saveFile,
   renameFile,
   deleteFile,

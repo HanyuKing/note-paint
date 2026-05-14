@@ -144,7 +144,6 @@
 - `showTutorial`：是否展示使用说明弹窗。
 - `showScaleToast`：是否展示缩放百分比。
 - `scalePercent`：缩放百分比文本。
-- `showAd`：是否展示底部广告位。
 - `exportWidth` / `exportHeight`：离屏导出 Canvas 尺寸。
 
 ## 6. 坐标系统
@@ -317,9 +316,11 @@ canvasY <= box.maxY + obj.y
 
 当前图片对象支持插入、显示、选择和拖动，不支持缩放、旋转、裁剪或删除单个图片。
 
-## 13. 导出保存
+## 13. 文件保存和导出
 
-保存使用离屏 Canvas，而不是直接改变主画布。
+本地文件保存由 `utils/boardStore.js` 负责，文件数量解锁配置由 `utils/fileUnlockStore.js` 存储在本地。默认解锁数量为 1，创建新文件时如果现有文件数达到已解锁数量，需要先完整观看保存广告，完成后将解锁数量加 1 再继续保存。
+
+导出使用离屏 Canvas，而不是直接改变主画布。画板页导出按钮和文件列表页导出动作都会先播放导出广告，广告完整观看后才生成图片并保存到相册。
 
 ### 13.1 导出尺寸计算
 
@@ -334,7 +335,7 @@ fullHeight = bounds.maxY - bounds.minY + padding * 2
 
 ### 13.2 离屏绘制
 
-保存时创建 `exportCanvas` 对应的 Canvas 上下文，调用 `renderToContext`：
+导出时创建 `exportCanvas` 对应的 Canvas 上下文，调用 `renderToContext`：
 
 - `scale = 1`
 - `tx = -bounds.minX + padding`
@@ -368,16 +369,16 @@ fullHeight = bounds.maxY - bounds.minY + padding * 2
 
 ## 15. 广告实现
 
-页面底部通过 `ad-custom` 组件集成原生模板广告。
+项目通过 `utils/rewardedVideoAd.js` 封装微信小程序激励视频广告，每个页面创建并复用当前页面内的广告实例。
 
 相关逻辑：
 
-- `showAd` 控制广告容器显示。
-- `adLoad` 记录加载成功日志。
-- `adError` 记录加载失败日志。
-- `adClose` 将 `showAd` 置为 `false`。
+- 保存新文件超过本地解锁数量时使用广告位 `adunit-fbfb5a29542b3196`。
+- 导出图片时使用广告位 `adunit-e7ab73bbb204f635`。
+- `show()` 失败时会先调用 `load()` 重新拉取，再尝试展示。
+- `onClose` 中只有 `res.isEnded === true` 才继续保存或导出。
 
-广告容器使用固定定位，并为安全区域底部留出 padding。
+广告未完整观看或广告展示失败时，业务流程中断并给出提示。
 
 ## 16. 性能设计
 

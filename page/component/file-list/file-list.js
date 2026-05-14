@@ -1,4 +1,5 @@
 const boardStore = require('../../../utils/boardStore');
+const rewardedVideoAd = require('../../../utils/rewardedVideoAd');
 
 function setStrokeStyleCompat(ctx, value) {
   if (!ctx) return;
@@ -44,11 +45,22 @@ Page({
     exportHeight: 0
   },
 
+  onLoad() {
+    this.exportImageAd = rewardedVideoAd.createRewardedVideoAd(rewardedVideoAd.EXPORT_IMAGE_AD_UNIT_ID, {
+      cancelMessage: '完整观看广告后才能导出',
+      errorMessage: '广告暂不可用，请稍后再试'
+    });
+  },
+
   onShow() {
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 1 });
     }
     this.refreshFiles();
+  },
+
+  onUnload() {
+    if (this.exportImageAd && this.exportImageAd.destroy) this.exportImageAd.destroy();
   },
 
   refreshFiles() {
@@ -197,7 +209,24 @@ Page({
       wx.showToast({ title: '画板为空', icon: 'none' });
       return;
     }
+    this.requireExportAd(() => this.doExportBoard(boardData));
+  },
 
+  requireExportAd(callback) {
+    if (!this.exportImageAd) {
+      wx.showToast({ title: '广告未初始化，请稍后再试', icon: 'none' });
+      return;
+    }
+    this.exportImageAd.show((ok, message) => {
+      if (!ok) {
+        if (message) wx.showToast({ title: message, icon: 'none' });
+        return;
+      }
+      if (typeof callback === 'function') callback();
+    });
+  },
+
+  doExportBoard(boardData) {
     const bounds = boardData.canvasBounds || { minX: 0, maxX: 800, minY: 0, maxY: 1000 };
     const contentWidth = Math.max(bounds.maxX - bounds.minX, 1);
     const contentHeight = Math.max(bounds.maxY - bounds.minY, 1);

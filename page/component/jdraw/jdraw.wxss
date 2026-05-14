@@ -912,6 +912,13 @@ page {
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.zoom-toast-visible {
+  opacity: 1;
 }
 
 .zoom-text {

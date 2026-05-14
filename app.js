@@ -1,4 +1,11 @@
 //app.js
+function isRewardedVideoPlayerError(error) {
+  const msg = typeof error === 'string'
+    ? error
+    : (error && (error.errMsg || error.message || JSON.stringify(error))) || '';
+  return /updateVideoPlayer:fail invalid videoPlayerId/i.test(msg);
+}
+
 App({
   onLaunch: function () {
     var logs = wx.getStorageSync('logs') || []
@@ -18,5 +25,20 @@ App({
   globalData: {
     userInfo: null,
     pendingFileId: ''
+  },
+  onUnhandledRejection: function (res) {
+    const reason = res && res.reason;
+    if (isRewardedVideoPlayerError(reason)) {
+      console.warn('忽略激励视频广告 SDK 内部状态错误:', reason);
+      return;
+    }
+    console.error('未处理的 Promise 异常:', reason);
+  },
+  onError: function (error) {
+    if (isRewardedVideoPlayerError(error)) {
+      console.warn('忽略激励视频广告 SDK 内部状态错误:', error);
+      return;
+    }
+    console.error(error);
   }
 })

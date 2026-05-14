@@ -1,4 +1,6 @@
 const boardStore = require('../../../utils/boardStore');
+const fileUnlockStore = require('../../../utils/fileUnlockStore');
+const rewardedVideoAd = require('../../../utils/rewardedVideoAd');
 const TUTORIAL_STORAGE_KEY = 'hasUsedNotePaint';
 const TUTORIAL_DOT_STORAGE_KEY = 'hasReadNotePaintTutorialDot';
 
@@ -352,6 +354,14 @@ Page({
   },
 
   onLoad() {
+    this.saveFileAd = rewardedVideoAd.createRewardedVideoAd(rewardedVideoAd.SAVE_FILE_AD_UNIT_ID, {
+      cancelMessage: '完整观看广告后才能保存更多文件',
+      errorMessage: '广告暂不可用，请稍后再试'
+    });
+    this.exportImageAd = rewardedVideoAd.createRewardedVideoAd(rewardedVideoAd.EXPORT_IMAGE_AD_UNIT_ID, {
+      cancelMessage: '完整观看广告后才能导出',
+      errorMessage: '广告暂不可用，请稍后再试'
+    });
     this.initTutorialDot();
     this.consumePendingFileId(true);
   },
@@ -364,6 +374,11 @@ Page({
       });
     }
     this.consumePendingFileId(false);
+  },
+
+  onUnload() {
+    if (this.saveFileAd && this.saveFileAd.destroy) this.saveFileAd.destroy();
+    if (this.exportImageAd && this.exportImageAd.destroy) this.exportImageAd.destroy();
   },
 
   onReady() {
@@ -1085,8 +1100,14 @@ Page({
       this.data.lastTouchDistance = currentDistance;
       this.data.lastPanPoint = { x: centerX, y: centerY };
       const newPercent = Math.round(newScale * 100);
+      if (this.scaleToastTimer) {
+        clearTimeout(this.scaleToastTimer);
+        this.scaleToastTimer = null;
+      }
       if (newPercent !== this.data.scalePercent) {
         this.setData({ scalePercent: newPercent, showScaleToast: true });
+      } else if (!this.data.showScaleToast) {
+        this.setData({ showScaleToast: true });
       }
       const now = Date.now();
       if (now - (this.lastRenderTime || 0) > 20) {
@@ -1112,17 +1133,26 @@ Page({
     if (this.data.showColorPicker || this.data.showTutorial) return;
     if (!this.context) return;
     const changed = this.data.isDrawing || this.data.isDraggingObject;
+    const wasZooming = this.data.isZooming;
     const pendingCanvasBoundsData = this.pendingCanvasBoundsData || {};
     this.pendingCanvasBoundsData = null;
-    this.setData(Object.assign({}, pendingCanvasBoundsData, {
+    const nextData = Object.assign({}, pendingCanvasBoundsData, {
       isDrawing: false,
       isPanning: false,
       isZooming: false,
       isDraggingObject: false,
       lastPanPoint: null,
-      lastTouchDistance: 0,
-      showScaleToast: false
-    }));
+      lastTouchDistance: 0
+    });
+    if (!wasZooming) nextData.showScaleToast = false;
+    this.setData(nextData);
+    if (wasZooming) {
+      if (this.scaleToastTimer) clearTimeout(this.scaleToastTimer);
+      this.scaleToastTimer = setTimeout(() => {
+        this.scaleToastTimer = null;
+        this.setData({ showScaleToast: false });
+      }, 250);
+    }
     if (changed) this.markChanged();
   },
 
@@ -1396,7 +1426,24 @@ Page({
       wx.showToast({ title: '画板为空', icon: 'none' });
       return;
     }
+    this.requireExportAd(() => this.doExportImage());
+  },
 
+  requireExportAd(callback) {
+    if (!this.exportImageAd) {
+      wx.showToast({ title: '广告未初始化，请稍后再试', icon: 'none' });
+      return;
+    }
+    this.exportImageAd.show((ok, message) => {
+      if (!ok) {
+        if (message) wx.showToast({ title: message, icon: 'none' });
+        return;
+      }
+      if (typeof callback === 'function') callback();
+    });
+  },
+
+  doExportImage() {
     const bounds = this.data.canvasBounds;
     const contentWidth = Math.max(bounds.maxX - bounds.minX, 1);
     const contentHeight = Math.max(bounds.maxY - bounds.minY, 1);
@@ -1500,11 +1547,37 @@ Page({
       wx.showToast({ title: '画板为空，无需保存', icon: 'none' });
       return;
     }
-    if (!boardStore.canCreateFile(this.data.currentFileId)) {
-      wx.showToast({ title: '开通会员后可保存更多文件', icon: 'none' });
+
+    if (!this.canSaveCurrentBoard()) {
+      this.requireSaveFileAd(() => {
+        fileUnlockStore.unlockNextFile(boardStore.getFiles().length);
+        this.doSaveBoard();
+      });
       return;
     }
 
+    this.doSaveBoard();
+  },
+
+  canSaveCurrentBoard() {
+    return fileUnlockStore.canCreateFile(this.data.currentFileId, boardStore.getFiles().length);
+  },
+
+  requireSaveFileAd(callback) {
+    if (!this.saveFileAd) {
+      wx.showToast({ title: '广告未初始化，请稍后再试', icon: 'none' });
+      return;
+    }
+    this.saveFileAd.show((ok, message) => {
+      if (!ok) {
+        if (message) wx.showToast({ title: message, icon: 'none' });
+        return;
+      }
+      if (typeof callback === 'function') callback();
+    });
+  },
+
+  doSaveBoard() {
     this.setData({ isSavingBoard: true });
     wx.showLoading({ title: '正在保存...', mask: true });
 

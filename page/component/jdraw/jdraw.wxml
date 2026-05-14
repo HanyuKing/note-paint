@@ -255,7 +255,7 @@
         canvas-id="exportCanvas"
       ></canvas>
 
-      <cover-view class="zoom-toast" wx:if="{{showScaleToast}}">
+      <cover-view class="zoom-toast {{showScaleToast ? 'zoom-toast-visible' : ''}}">
         <cover-view class="zoom-text">{{scalePercent}}%</cover-view>
       </cover-view>
     </view>
