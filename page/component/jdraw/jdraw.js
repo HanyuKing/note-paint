@@ -1,4 +1,6 @@
 const boardStore = require('../../../utils/boardStore');
+const TUTORIAL_STORAGE_KEY = 'hasUsedNotePaint';
+const TUTORIAL_DOT_STORAGE_KEY = 'hasReadNotePaintTutorialDot';
 
 function toHex(n) {
   const h = Math.max(0, Math.min(255, Math.round(n))).toString(16);
@@ -103,6 +105,10 @@ function flushCanvasCompat(ctx, preserve, callback) {
     return;
   }
   if (typeof callback === 'function') callback();
+}
+
+function isCanvas2dContext(ctx) {
+  return !!(ctx && typeof ctx.draw !== 'function');
 }
 
 /** 取值 0～max → thumb-lane（两端圆帽圆心之间）上 0%～100%，与 WXSS inset 同步 */
@@ -329,6 +335,7 @@ Page({
     canvasBounds: { minX: 0, maxX: 800, minY: 0, maxY: 1000 },
 
     showTutorial: false,
+    showTutorialDot: true,
     showScaleToast: false,
     scalePercent: 100,
 
@@ -343,6 +350,7 @@ Page({
   },
 
   onLoad() {
+    this.initTutorialDot();
     this.consumePendingFileId(true);
   },
 
@@ -374,6 +382,7 @@ Page({
       .fields({ node: true, size: true }, res => {
         if (!res || !res.node) return;
         this.mainCanvas = res.node;
+        this.imageNodeCache = {};
         this.context = res.node.getContext('2d');
         this.syncMainCanvasSize();
         if (this.data.graphObjects.length > 0) {
@@ -403,6 +412,29 @@ Page({
     if (!this.context) return;
     this.syncMainCanvasSize();
     this.context.clearRect(0, 0, this.data.canvasWidth, this.data.canvasHeight);
+  },
+
+  getImageDrawSource(src, callback) {
+    if (!src || !this.mainCanvas) {
+      callback(src || '');
+      return;
+    }
+    if (!isCanvas2dContext(this.context)) {
+      callback(src);
+      return;
+    }
+    this.imageNodeCache = this.imageNodeCache || {};
+    if (this.imageNodeCache[src]) {
+      callback(this.imageNodeCache[src]);
+      return;
+    }
+    const img = this.mainCanvas.createImage();
+    img.onload = () => {
+      this.imageNodeCache[src] = img;
+      callback(img);
+    };
+    img.onerror = () => callback('');
+    img.src = src;
   },
 
   // ---------- 文件加载 ----------
@@ -764,9 +796,9 @@ Page({
 
   checkFirstTimeUser() {
     try {
-      if (!wx.getStorageSync('hasUsedNotePaint')) {
+      if (!wx.getStorageSync(TUTORIAL_STORAGE_KEY)) {
         setTimeout(() => {
-          this.openTutorial();
+          this.showTutorialModal();
         }, 500);
       }
     } catch (e) {
@@ -774,16 +806,41 @@ Page({
     }
   },
 
-  openTutorial() {
+  initTutorialDot() {
+    try {
+      this.setData({
+        showTutorialDot: !wx.getStorageSync(TUTORIAL_DOT_STORAGE_KEY)
+      });
+    } catch (e) {
+      console.error('读取说明提示状态失败:', e);
+    }
+  },
+
+  markTutorialDotRead() {
+    if (!this.data.showTutorialDot) return;
+    this.setData({ showTutorialDot: false });
+    try {
+      wx.setStorageSync(TUTORIAL_DOT_STORAGE_KEY, true);
+    } catch (e) {
+      console.error('保存说明提示状态失败:', e);
+    }
+  },
+
+  showTutorialModal() {
     this.setTabBarHidden(false);
     this.setData({ showTutorial: true });
+  },
+
+  openTutorial() {
+    this.markTutorialDotRead();
+    this.showTutorialModal();
   },
 
   closeTutorial() {
     this.setTabBarHidden(false);
     this.setData({ showTutorial: false });
     try {
-      wx.setStorageSync('hasUsedNotePaint', true);
+      wx.setStorageSync(TUTORIAL_STORAGE_KEY, true);
     } catch (e) {
       console.error('保存使用状态失败:', e);
     }
@@ -1038,6 +1095,7 @@ Page({
   },
 
   renderToContext(ctx, width, height, scale, tx, ty, isExport, contentOffset) {
+    const asyncImageTasks = [];
     const offsetX = contentOffset && typeof contentOffset.x === 'number' ? contentOffset.x : 0;
     const offsetY = contentOffset && typeof contentOffset.y === 'number' ? contentOffset.y : 0;
     ctx.clearRect(0, 0, width, height);
@@ -1063,21 +1121,22 @@ Page({
         const objMinY = box.minY + (obj.y || 0);
         const objMaxY = box.maxY + (obj.y || 0);
         if (objMinX > vX + vW || objMaxX < vX || objMinY > vY + vH || objMaxY < vY) continue;
-        this.drawObject(ctx, obj, false);
+        this.drawObject(ctx, obj, false, asyncImageTasks);
       }
     } else {
       for (let i = 0; i < objects.length; i++) {
-        this.drawObject(ctx, objects[i], true);
+        this.drawObject(ctx, objects[i], true, asyncImageTasks);
       }
     }
     ctx.restore();
+    return asyncImageTasks;
   },
 
   redrawCanvas() {
     if (!this.context) return;
     this.syncMainCanvasSize();
     const offset = this.getCanvasContentOffset();
-    this.renderToContext(
+    const asyncImageTasks = this.renderToContext(
       this.context,
       this.data.canvasWidth,
       this.data.canvasHeight,
@@ -1087,10 +1146,20 @@ Page({
       false,
       offset
     );
+    if (asyncImageTasks && asyncImageTasks.length) {
+      let pending = asyncImageTasks.length;
+      let shouldRedraw = false;
+      const done = loaded => {
+        shouldRedraw = shouldRedraw || !!loaded;
+        pending--;
+        if (pending <= 0 && shouldRedraw) this.redrawCanvas();
+      };
+      asyncImageTasks.forEach(task => task(done));
+    }
     flushCanvasCompat(this.context, false);
   },
 
-  drawObject(ctx, obj, hideSelection) {
+  drawObject(ctx, obj, hideSelection, asyncImageTasks) {
     if (obj.type === 'path') {
       if (obj.points.length > 0) {
         setStrokeStyleCompat(ctx, obj.style.color);
@@ -1105,7 +1174,20 @@ Page({
         ctx.stroke();
       }
     } else if (obj.type === 'image') {
-      ctx.drawImage(obj.src, obj.x, obj.y, obj.w, obj.h);
+      if (isCanvas2dContext(ctx)) {
+        const cached = this.imageNodeCache && this.imageNodeCache[obj.src];
+        if (cached) {
+          ctx.drawImage(cached, obj.x, obj.y, obj.w, obj.h);
+        } else if (asyncImageTasks) {
+          asyncImageTasks.push(done => {
+            this.getImageDrawSource(obj.src, source => {
+              if (typeof done === 'function') done(!!source);
+            });
+          });
+        }
+      } else {
+        ctx.drawImage(obj.src, obj.x, obj.y, obj.w, obj.h);
+      }
     }
 
     if (!hideSelection && this.data.activeObjectId === obj.id) {

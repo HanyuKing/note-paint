@@ -7,7 +7,12 @@
     bindtap="switchTab"
   >
     <view class="icon">
-      <view wx:if="{{index === 0}}" class="icon-shape board {{selected === index ? 'on' : ''}}"></view>
+      <image
+        wx:if="{{index === 0}}"
+        class="tab-icon-img"
+        src="{{selected === index ? '/image/tab_palette_on.png' : '/image/tab_palette.png'}}"
+        mode="aspectFit"
+      ></image>
       <view wx:else class="icon-shape folder {{selected === index ? 'on' : ''}}"></view>
     </view>
     <view class="label">{{item.text}}</view>

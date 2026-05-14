@@ -42,7 +42,7 @@
       <view class="tool-icon export-icon"></view>
       <view class="tool-label">导出</view>
     </view>
-    <view class="tool" bindtap="openTutorial">
+    <view class="tool help-tool {{showTutorialDot ? 'help-tool-dot' : ''}}" bindtap="openTutorial">
       <view class="tool-icon help-icon"></view>
       <view class="tool-label">说明</view>
     </view>
@@ -269,8 +269,14 @@
       </view>
       <view class="tutorial-content">
         <view class="tutorial-item">
-          <view class="tutorial-icon"><view class="tool-icon select-icon"></view></view>
+          <view class="tutorial-icon">
+            <view class="tool-icon select-icon"></view>
+          </view>
           <view class="tutorial-text">选择：点选对象后可拖动位置；空白处单指拖动可平移视图。</view>
+        </view>
+        <view class="tutorial-item">
+          <view class="tutorial-icon"><view class="tool-icon gesture-icon"></view></view>
+          <view class="tutorial-text">双指：捏合可缩放画板，双指拖动可平移视图。</view>
         </view>
         <view class="tutorial-item">
           <view class="tutorial-icon"><view class="tool-icon pen-icon"><view class="pen-tip"></view></view></view>

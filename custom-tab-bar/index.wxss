@@ -47,40 +47,10 @@
   position: relative;
 }
 
-/* 画板：调色板（圆形 + 三个点） */
-.icon-shape.board {
-  border-radius: 50%;
-  border: 3rpx solid #9CA3AF;
-  background: transparent;
-}
-
-.icon-shape.board::before,
-.icon-shape.board::after {
-  content: '';
-  position: absolute;
-  width: 8rpx;
-  height: 8rpx;
-  border-radius: 50%;
-  background: #9CA3AF;
-}
-
-.icon-shape.board::before {
-  top: 6rpx;
-  left: 14rpx;
-}
-
-.icon-shape.board::after {
-  top: 18rpx;
-  right: 6rpx;
-}
-
-.icon-shape.board.on {
-  border-color: #2563EB;
-}
-
-.icon-shape.board.on::before,
-.icon-shape.board.on::after {
-  background: #2563EB;
+.tab-icon-img {
+  width: 48rpx;
+  height: 48rpx;
+  display: block;
 }
 
 /* 文件夹 */
