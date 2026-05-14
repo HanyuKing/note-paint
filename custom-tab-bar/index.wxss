@@ -41,44 +41,10 @@
   position: relative;
 }
 
-.icon-shape {
-  width: 40rpx;
-  height: 40rpx;
-  position: relative;
-}
-
 .tab-icon-img {
   width: 48rpx;
   height: 48rpx;
   display: block;
-}
-
-/* 文件夹 */
-.icon-shape.folder {
-  width: 46rpx;
-  height: 34rpx;
-  border: 3rpx solid #9CA3AF;
-  border-radius: 4rpx 8rpx 8rpx 8rpx;
-  background: transparent;
-  margin-top: 6rpx;
-}
-
-.icon-shape.folder::before {
-  content: '';
-  position: absolute;
-  top: -10rpx;
-  left: -3rpx;
-  width: 22rpx;
-  height: 10rpx;
-  border: 3rpx solid #9CA3AF;
-  border-bottom: none;
-  border-radius: 4rpx 4rpx 0 0;
-  background: transparent;
-}
-
-.icon-shape.folder.on,
-.icon-shape.folder.on::before {
-  border-color: #2563EB;
 }
 
 .label {

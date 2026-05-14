@@ -8,12 +8,10 @@
   >
     <view class="icon">
       <image
-        wx:if="{{index === 0}}"
         class="tab-icon-img"
-        src="{{selected === index ? '/image/tab_palette_on.png' : '/image/tab_palette.png'}}"
+        src="{{selected === index ? item.selectedIconPath : item.iconPath}}"
         mode="aspectFit"
       ></image>
-      <view wx:else class="icon-shape folder {{selected === index ? 'on' : ''}}"></view>
     </view>
     <view class="label">{{item.text}}</view>
     <view class="indicator {{selected === index ? 'indicator-on' : ''}}"></view>

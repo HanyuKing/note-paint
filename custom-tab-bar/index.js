@@ -5,11 +5,15 @@ Component({
     list: [
       {
         pagePath: '/page/component/jdraw/jdraw',
-        text: '画板'
+        text: '画板',
+        iconPath: '/image/tab_palette.png',
+        selectedIconPath: '/image/tab_palette_on.png'
       },
       {
         pagePath: '/page/component/file-list/file-list',
-        text: '文件'
+        text: '文件',
+        iconPath: '/image/tab_file.png',
+        selectedIconPath: '/image/tab_file_on.png'
       }
     ]
   },
