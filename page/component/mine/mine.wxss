@@ -1,0 +1,109 @@
+@import "../../../styles/support.wxss";
+
+.mine-page {
+  padding-bottom: calc(176rpx + env(safe-area-inset-bottom));
+}
+
+.menu-card {
+  border: 2rpx solid #F3F4F6;
+  border-radius: 24rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 16rpx rgba(15, 23, 42, 0.04);
+}
+
+.menu-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 144rpx;
+  margin: 0;
+  padding: 28rpx;
+  border: 0;
+  border-radius: 0;
+  background: #FFFFFF;
+  color: #111827;
+  text-align: left;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+
+.menu-row::after {
+  border: 0;
+}
+
+.menu-row + .menu-row {
+  border-top: 2rpx solid #F3F4F6;
+}
+
+.menu-row-hover {
+  background: #F9FAFB;
+}
+
+.menu-copy {
+  flex: 1;
+  min-width: 0;
+  margin: 0 24rpx;
+}
+
+.menu-title {
+  font-size: 30rpx;
+  font-weight: 500;
+}
+
+.menu-description {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #9CA3AF;
+}
+
+.menu-arrow {
+  width: 12rpx;
+  height: 12rpx;
+  border-top: 3rpx solid #9CA3AF;
+  border-right: 3rpx solid #9CA3AF;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+
+.menu-icon {
+  position: relative;
+  width: 48rpx;
+  height: 48rpx;
+  flex-shrink: 0;
+  color: #2563EB;
+}
+
+.feedback-icon::before {
+  content: '';
+  position: absolute;
+  inset: 5rpx 2rpx 9rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 10rpx;
+}
+
+.feedback-icon::after {
+  content: '';
+  position: absolute;
+  left: 12rpx;
+  bottom: 3rpx;
+  width: 10rpx;
+  height: 10rpx;
+  border-left: 3rpx solid currentColor;
+  transform: skewY(-40deg);
+  background: #FFFFFF;
+}
+
+.help-icon,
+.about-icon {
+  border: 3rpx solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  line-height: 42rpx;
+}
+
+.about-icon {
+  font-family: Georgia, serif;
+}

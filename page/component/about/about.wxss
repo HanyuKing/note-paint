@@ -1,0 +1,22 @@
+@import "../../../styles/support.wxss";
+
+.about-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24rpx 0 48rpx;
+}
+
+.about-brand .brand-mark {
+  margin-bottom: 24rpx;
+}
+
+.version {
+  margin-top: 16rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 20rpx;
+  background: #F3F4F6;
+  color: #6B7280;
+  font-size: 24rpx;
+  line-height: 1.5;
+}

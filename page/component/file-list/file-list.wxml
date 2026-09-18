@@ -20,7 +20,7 @@
       <view class="empty-line"></view>
       <view class="empty-line short"></view>
     </view>
-    <view class="empty-title">还没有画板文件</view>
+    <view class="empty-title">还没有作品</view>
     <view class="empty-desc">点击下方“画板”开始创作</view>
   </view>
 

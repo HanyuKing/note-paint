@@ -4,7 +4,7 @@ page {
 }
 
 .page {
-  padding: 32rpx 32rpx 200rpx;
+  padding: 32rpx 32rpx calc(360rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
@@ -232,7 +232,7 @@ page {
 .fab {
   position: fixed;
   right: 32rpx;
-  bottom: calc(140rpx + env(safe-area-inset-bottom));
+  bottom: calc(160rpx + env(safe-area-inset-bottom));
   width: 160rpx;
   height: 160rpx;
   padding: 16rpx;

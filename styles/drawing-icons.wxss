@@ -1,0 +1,295 @@
+.tool-icon {
+  width: 44rpx;
+  height: 44rpx;
+  position: relative;
+}
+
+/* 新建: 加号 */
+.plus-icon::before,
+.plus-icon::after {
+  content: '';
+  position: absolute;
+  background: #1F2937;
+  border-radius: 2rpx;
+}
+
+.plus-icon::before {
+  top: 50%;
+  left: 8rpx;
+  right: 8rpx;
+  height: 4rpx;
+  transform: translateY(-50%);
+}
+
+.plus-icon::after {
+  left: 50%;
+  top: 8rpx;
+  bottom: 8rpx;
+  width: 4rpx;
+  transform: translateX(-50%);
+}
+
+/* 选择: 手势 */
+.select-icon {
+  color: #1F2937;
+}
+
+.select-icon::before {
+  content: '';
+  position: absolute;
+  inset: 3rpx;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20.5 4c-2.2 0-4 1.8-4 4v13.6l-2.7-3.2c-1.4-1.7-4-1.9-5.7-.5-1.6 1.4-1.8 3.8-.6 5.5l9.6 13.2c2.2 3 5.7 4.8 9.4 4.8h4.9c6.3 0 11.4-5.1 11.4-11.4V17.5c0-2.1-1.7-3.8-3.8-3.8-1.1 0-2.1.5-2.8 1.2-.7-1.4-2.1-2.3-3.7-2.3-1.1 0-2.1.4-2.8 1.1-.7-1.3-2.1-2.2-3.7-2.2-.6 0-1.1.1-1.6.3V8c0-2.2-1.8-4-4-4Zm0 3c.6 0 1 .4 1 1v16.8c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5v-9.1c0-.7.6-1.3 1.3-1.3s1.3.6 1.3 1.3v9.1c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5v-8.1c0-.7.6-1.3 1.3-1.3s1.3.6 1.3 1.3v8.1c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5v-6.9c0-.7.6-1.3 1.3-1.3s1.3.6 1.3 1.3V30c0 4.6-3.8 8.4-8.4 8.4h-4.9c-2.8 0-5.4-1.3-7-3.6L10 21.6c-.3-.4-.2-1 .2-1.3.4-.3 1-.2 1.3.1l5.3 6.4c.4.5 1.1.7 1.7.5.6-.2 1-.8 1-1.4V8c0-.6.4-1 1-1Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20.5 4c-2.2 0-4 1.8-4 4v13.6l-2.7-3.2c-1.4-1.7-4-1.9-5.7-.5-1.6 1.4-1.8 3.8-.6 5.5l9.6 13.2c2.2 3 5.7 4.8 9.4 4.8h4.9c6.3 0 11.4-5.1 11.4-11.4V17.5c0-2.1-1.7-3.8-3.8-3.8-1.1 0-2.1.5-2.8 1.2-.7-1.4-2.1-2.3-3.7-2.3-1.1 0-2.1.4-2.8 1.1-.7-1.3-2.1-2.2-3.7-2.2-.6 0-1.1.1-1.6.3V8c0-2.2-1.8-4-4-4Zm0 3c.6 0 1 .4 1 1v16.8c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5v-9.1c0-.7.6-1.3 1.3-1.3s1.3.6 1.3 1.3v9.1c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5v-8.1c0-.7.6-1.3 1.3-1.3s1.3.6 1.3 1.3v8.1c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5v-6.9c0-.7.6-1.3 1.3-1.3s1.3.6 1.3 1.3V30c0 4.6-3.8 8.4-8.4 8.4h-4.9c-2.8 0-5.4-1.3-7-3.6L10 21.6c-.3-.4-.2-1 .2-1.3.4-.3 1-.2 1.3.1l5.3 6.4c.4.5 1.1.7 1.7.5.6-.2 1-.8 1-1.4V8c0-.6.4-1 1-1Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.tool.active .select-icon {
+  color: #111827;
+}
+
+/* 画笔: 圆圈笔尖 */
+.pen-icon {
+  width: 44rpx;
+  height: 44rpx;
+  color: #1F2937;
+}
+
+.pen-icon::before {
+  content: '';
+  position: absolute;
+  inset: 4rpx;
+  border: 4rpx solid currentColor;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.pen-tip {
+  position: absolute;
+  left: 50%;
+  top: 11rpx;
+  width: 20rpx;
+  height: 24rpx;
+  background: currentColor;
+  clip-path: polygon(50% 0, 84% 100%, 16% 100%);
+  transform: translateX(-50%);
+}
+
+.pen-tip::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 10rpx;
+  width: 4rpx;
+  height: 14rpx;
+  background: #FFFFFF;
+  border-radius: 2rpx;
+  transform: translateX(-50%);
+}
+
+.pen-tip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 6rpx;
+  width: 7rpx;
+  height: 7rpx;
+  border-radius: 50%;
+  background: #FFFFFF;
+  transform: translateX(-50%);
+}
+
+/* 橡皮: 倾斜的方块 */
+.eraser-icon::before {
+  content: '';
+  position: absolute;
+  left: 4rpx;
+  top: 12rpx;
+  width: 36rpx;
+  height: 22rpx;
+  border: 4rpx solid #1F2937;
+  border-radius: 4rpx;
+  transform: rotate(-30deg);
+}
+
+.tool.active .eraser-icon::before {
+  border-color: #111827;
+}
+
+/* 插图: 图片框 + 小山 */
+.image-icon::before {
+  content: '';
+  position: absolute;
+  inset: 4rpx;
+  border: 4rpx solid #1F2937;
+  border-radius: 6rpx;
+}
+
+.image-icon::after {
+  content: '';
+  position: absolute;
+  left: 10rpx;
+  bottom: 10rpx;
+  width: 24rpx;
+  height: 12rpx;
+  background: #1F2937;
+  clip-path: polygon(0 100%, 35% 30%, 60% 70%, 80% 40%, 100% 100%);
+}
+
+.tool.active .image-icon::before {
+  border-color: #111827;
+}
+
+.tool.active .image-icon::after {
+  background: #111827;
+}
+
+/* 撤销: 弧形箭头 */
+.undo-icon::before {
+  content: '';
+  position: absolute;
+  left: 6rpx;
+  top: 10rpx;
+  width: 30rpx;
+  height: 22rpx;
+  border: 4rpx solid #1F2937;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  transform: rotate(45deg);
+}
+
+.undo-icon::after {
+  content: '';
+  position: absolute;
+  left: 4rpx;
+  top: 14rpx;
+  width: 0;
+  height: 0;
+  border-top: 6rpx solid transparent;
+  border-bottom: 6rpx solid transparent;
+  border-right: 10rpx solid #1F2937;
+}
+
+.tool.active .undo-icon::before {
+  border-color: #111827;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.tool.active .undo-icon::after {
+  border-right-color: #111827;
+}
+
+/* 保存: 软盘 */
+.save-icon::before {
+  content: '';
+  position: absolute;
+  inset: 4rpx;
+  border: 4rpx solid #1F2937;
+  border-radius: 4rpx;
+}
+
+.save-icon::after {
+  content: '';
+  position: absolute;
+  left: 12rpx;
+  top: 8rpx;
+  width: 20rpx;
+  height: 12rpx;
+  background: #1F2937;
+}
+
+.tool.active .save-icon::before {
+  border-color: #111827;
+}
+
+.tool.active .save-icon::after {
+  background: #111827;
+}
+
+/* 导出: 托盘 + 向上箭头 */
+.export-icon::before {
+  content: '';
+  position: absolute;
+  left: 4rpx;
+  right: 4rpx;
+  bottom: 4rpx;
+  height: 16rpx;
+  border: 4rpx solid #1F2937;
+  border-top: none;
+  border-radius: 0 0 6rpx 6rpx;
+}
+
+.export-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 4rpx;
+  width: 4rpx;
+  height: 24rpx;
+  background: #1F2937;
+  border-radius: 2rpx;
+  transform: translateX(-50%);
+  box-shadow:
+    -8rpx 6rpx 0 -2rpx #1F2937,
+    8rpx 6rpx 0 -2rpx #1F2937;
+}
+
+.tool.active .export-icon::before {
+  border-color: #111827;
+}
+
+.tool.active .export-icon::after {
+  background: #111827;
+  box-shadow:
+    -8rpx 6rpx 0 -2rpx #111827,
+    8rpx 6rpx 0 -2rpx #111827;
+}
+
+/* 说明: 问号圆圈 */
+.help-icon::before {
+  content: '';
+  position: absolute;
+  inset: 4rpx;
+  border: 4rpx solid #2563EB;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.help-icon::after {
+  content: '?';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1rpx;
+  text-align: center;
+  color: #2563EB;
+  font-size: 34rpx;
+  font-weight: 700;
+  line-height: 44rpx;
+}
+
+/* 双指手势 */
+.gesture-icon::before,
+.gesture-icon::after {
+  content: '';
+  position: absolute;
+  width: 12rpx;
+  height: 28rpx;
+  border: 4rpx solid #1F2937;
+  border-radius: 10rpx;
+  background: transparent;
+}
+
+.gesture-icon::before {
+  left: 9rpx;
+  top: 8rpx;
+  transform: rotate(16deg);
+}
+
+.gesture-icon::after {
+  right: 9rpx;
+  top: 8rpx;
+  transform: rotate(-16deg);
+}
+

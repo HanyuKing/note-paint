@@ -1,0 +1,40 @@
+<view class="support-page mine-page">
+  <view class="brand">
+    <view class="brand-mark">
+      <image class="brand-image" src="/image/tab_palette_on.png" mode="aspectFit"></image>
+    </view>
+    <view class="brand-copy">
+      <view class="brand-title">笔记画板</view>
+      <view class="brand-description">随手绘画，记录每一个灵感</view>
+    </view>
+  </view>
+
+  <view class="menu-card">
+    <button class="menu-row" open-type="feedback" hover-class="menu-row-hover">
+      <view class="menu-icon feedback-icon"></view>
+      <view class="menu-copy">
+        <view class="menu-title">意见反馈</view>
+        <view class="menu-description">遇到问题，或有新的想法</view>
+      </view>
+      <view class="menu-arrow"></view>
+    </button>
+    <button class="menu-row" bindtap="openHelp" hover-class="menu-row-hover">
+      <view class="menu-icon help-icon">?</view>
+      <view class="menu-copy">
+        <view class="menu-title">使用帮助</view>
+        <view class="menu-description">操作指南与常见问题</view>
+      </view>
+      <view class="menu-arrow"></view>
+    </button>
+    <button class="menu-row" bindtap="openAbout" hover-class="menu-row-hover">
+      <view class="menu-icon about-icon">i</view>
+      <view class="menu-copy">
+        <view class="menu-title">关于笔记画板</view>
+        <view class="menu-description">产品介绍与版本信息</view>
+      </view>
+      <view class="menu-arrow"></view>
+    </button>
+  </view>
+
+  <view class="page-note">作品保存在本机，重要作品记得及时导出</view>
+</view>

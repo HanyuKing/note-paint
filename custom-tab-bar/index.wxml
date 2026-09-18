@@ -1,19 +1,28 @@
 <view class="tabbar {{hidden ? 'tabbar-hidden' : ''}}" hidden="{{hidden}}">
-  <view
-    class="tab {{selected === index ? 'tab-on' : ''}}"
-    wx:for="{{list}}"
-    wx:key="pagePath"
-    data-index="{{index}}"
-    bindtap="switchTab"
-  >
-    <view class="icon">
-      <image
-        class="tab-icon-img"
-        src="{{selected === index ? item.selectedIconPath : item.iconPath}}"
-        mode="aspectFit"
-      ></image>
+  <view class="tabbar-content">
+    <view
+      class="glass-selection"
+      style="width: {{100 / list.length}}%; transform: translateX({{selected * 100}}%);"
+    ></view>
+    <view
+      class="tab {{selected === index ? 'tab-on' : ''}}"
+      wx:for="{{list}}"
+      wx:key="pagePath"
+      data-index="{{index}}"
+      bindtap="switchTab"
+      hover-class="tab-pressed"
+      hover-stay-time="80"
+      aria-role="button"
+      aria-label="{{item.text}}"
+    >
+      <view class="icon">
+        <image
+          class="tab-icon-img"
+          src="{{selected === index ? item.selectedIconPath : item.iconPath}}"
+          mode="aspectFit"
+        ></image>
+      </view>
+      <view class="label">{{item.text}}</view>
     </view>
-    <view class="label">{{item.text}}</view>
-    <view class="indicator {{selected === index ? 'indicator-on' : ''}}"></view>
   </view>
 </view>

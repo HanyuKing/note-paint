@@ -24,13 +24,23 @@
 ├── app.js
 ├── app.json
 ├── app.wxss
+├── components
+│   └── drawing-guide
+├── custom-tab-bar
 ├── page
 │   └── component
+│       ├── mine
+│       ├── help
+│       ├── about
+│       ├── file-list
 │       └── jdraw
 │           ├── jdraw.js
 │           ├── jdraw.json
 │           ├── jdraw.wxml
 │           └── jdraw.wxss
+├── styles
+│   ├── drawing-icons.wxss
+│   └── support.wxss
 ├── project.config.json
 ├── sitemap.json
 └── README.md
@@ -47,17 +57,34 @@
 
 ## 4. 应用入口
 
-`app.json` 中只配置了一个页面：
+`app.json` 注册三个 Tab 页面和两个二级页面：
 
 ```json
 {
   "pages": [
-    "page/component/jdraw/jdraw"
+    "page/component/jdraw/jdraw",
+    "page/component/file-list/file-list",
+    "page/component/mine/mine",
+    "page/component/help/help",
+    "page/component/about/about"
   ]
 }
 ```
 
 窗口标题为“笔记画板”。相册权限通过 `permission.scope.writePhotosAlbum.desc` 配置，用于保存作品时向用户解释授权用途。
+
+底部导航顺序为“画板 / 作品 / 我的”，同时维护 `app.json` 的 `tabBar.list` 和 `custom-tab-bar/index.js` 的页面与图标配置。各 Tab 在 `onShow` 中设置选中项；“作品”和“我的”恢复导航可见，画板根据调色板状态控制可见性。切换到“我的”不写入待打开文件 ID，也不重建画板页面。
+
+自定义导航使用悬浮胶囊布局，距左右边缘 `24rpx`，底部保留 `16rpx` 与安全区；高度 `112rpx`、最小高度 `56px`。使用半透明底色、`backdrop-filter`、渐变高光和阴影呈现玻璃质感，背景模糊不可用时仍保留可读底色。浅蓝选中层按选中索引平移，带短时过渡。画板调色栏、说明遮罩及作品页新建按钮的底部避让同步调整，作品列表末尾留白覆盖悬浮按钮区域。
+
+### 4.1 我的与辅助页面
+
+- `mine` 提供意见反馈、使用帮助和关于笔记画板三个入口。使用 `button open-type="feedback"` 打开微信原生反馈，不接入自建存储，也不在返回页面时提示提交成功。
+- `help` 与画板弹窗复用 `components/drawing-guide`；图标样式抽取到 `styles/drawing-icons.wxss`。帮助页补充常见问题，权限按钮由用户点击触发 `wx.openSetting`。
+- `about` 从 `wx.getAccountInfoSync().miniProgram` 读取 `version` 和 `envVersion`。开发版、体验版展示环境名称；获取失败保留“版本信息暂不可用”，不写死发布版本。
+- 辅助页面复用 `styles/support.wxss` 和既有分享配置，不增加作品存储字段或修改已有作品数据。
+
+原生反馈和系统设置的完整行为需要真机验收。
 
 ## 5. 页面状态模型
 
@@ -320,7 +347,7 @@ canvasY <= box.maxY + obj.y
 
 本地文件保存由 `utils/boardStore.js` 负责，文件数量解锁配置由 `utils/fileUnlockStore.js` 存储在本地。默认解锁数量为 1，创建新文件时如果现有文件数达到已解锁数量，需要先完整观看保存广告，完成后将解锁数量加 1 再继续保存。
 
-导出使用离屏 Canvas，而不是直接改变主画布。画板页导出按钮和文件列表页导出动作都会先播放导出广告，广告完整观看后才生成图片并保存到相册。
+导出使用离屏 Canvas，而不是直接改变主画布。画板页导出按钮和作品列表页导出动作都会先播放导出广告，广告完整观看后才生成图片并保存到相册。
 
 ### 13.1 导出尺寸计算
 
@@ -365,7 +392,7 @@ fullHeight = bounds.maxY - bounds.minY + padding * 2
 3. 如果不存在，则延迟展示教程弹窗。
 4. 用户关闭教程后写入 `hasUsedNotePaint = true`。
 
-当前代码中 `showTutorialAgain` 和 `closeTutorial` 存在重复定义，后面的定义会覆盖前面的定义。被覆盖后的 `closeTutorial` 只关闭弹窗，不再写入首次使用标记。该问题可能导致首次使用弹窗状态无法按预期持久化，建议后续合并重复函数。
+工具栏说明入口通过 `hasReadNotePaintTutorialDot` 控制未读红点，用户主动打开说明时标记已读。弹窗内的 `drawing-guide` 与帮助页共用基本操作内容；弹窗使用滚动区域，关闭按钮保持可见。帮助页仅展示共用内容，不修改画板原有的首次使用和已读标记。
 
 ## 15. 广告实现
 
@@ -400,7 +427,6 @@ fullHeight = bounds.maxY - bounds.minY + padding * 2
 
 ## 17. 已知实现注意点
 
-- `showTutorialAgain` 和 `closeTutorial` 重复定义，后定义覆盖前定义。
 - 橡皮不是对象级擦除，而是白色路径覆盖。
 - `drawClear` 中仍保留 `points: []` 兼容字段，但当前核心数据已切换到 `graphObjects`。
 - `restoreAfterSave` 已不再需要，函数体仅保留说明。

@@ -1,7 +1,10 @@
 {
   "pages": [
     "page/component/jdraw/jdraw",
-    "page/component/file-list/file-list"
+    "page/component/file-list/file-list",
+    "page/component/mine/mine",
+    "page/component/help/help",
+    "page/component/about/about"
   ],
   "window": {
     "backgroundTextStyle": "light",
@@ -22,7 +25,11 @@
       },
       {
         "pagePath": "page/component/file-list/file-list",
-        "text": "文件"
+        "text": "作品"
+      },
+      {
+        "pagePath": "page/component/mine/mine",
+        "text": "我的"
       }
     ]
   },

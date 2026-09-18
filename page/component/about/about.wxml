@@ -1,0 +1,20 @@
+<view class="support-page">
+  <view class="about-brand">
+    <view class="brand-mark">
+      <image class="brand-image" src="/image/tab_palette_on.png" mode="aspectFit"></image>
+    </view>
+    <view class="brand-title">笔记画板</view>
+    <view class="version">{{versionText}}</view>
+  </view>
+
+  <view class="section-card">
+    <view class="section-title">让灵感随手可记</view>
+    <view class="body-text">一个轻量的手绘与图片批注工具。写下想法、画出草图，或在图片上做标记，再把作品保存下来。</view>
+  </view>
+  <view class="section-card">
+    <view class="section-title">关于你的作品</view>
+    <view class="body-text">画板需要手动保存，已保存的作品保存在当前设备的小程序本地数据中，可在“作品”中继续编辑。</view>
+    <view class="body-text">作品不会自动同步，换设备后无法直接看到原有作品。清除小程序数据可能导致作品丢失，重要作品建议及时导出到手机相册。</view>
+    <view class="body-text">导出的图片可用于查看和分享，不包含原画板的可编辑对象。</view>
+  </view>
+</view>

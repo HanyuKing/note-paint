@@ -11,9 +11,15 @@ Component({
       },
       {
         pagePath: '/page/component/file-list/file-list',
-        text: '文件',
+        text: '作品',
         iconPath: '/image/tab_file.png',
         selectedIconPath: '/image/tab_file_on.png'
+      },
+      {
+        pagePath: '/page/component/mine/mine',
+        text: '我的',
+        iconPath: '/image/tab_mine.png',
+        selectedIconPath: '/image/tab_mine_on.png'
       }
     ]
   },

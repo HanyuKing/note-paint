@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "笔记画板",
+  "navigationBarTitleText": "使用帮助",
   "usingComponents": {
     "drawing-guide": "/components/drawing-guide/index"
   }

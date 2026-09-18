@@ -1,0 +1,35 @@
+@import "../../../styles/support.wxss";
+
+.help-intro {
+  padding: 8rpx 0 40rpx;
+}
+
+.faq-heading {
+  margin-top: 48rpx;
+}
+
+.question {
+  margin-bottom: 16rpx;
+  font-size: 29rpx;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.settings-button {
+  margin-top: 24rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 14rpx;
+  background: #EFF6FF;
+  color: #2563EB;
+  font-size: 28rpx;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.settings-button::after {
+  border: 0;
+}
+
+.settings-button-hover {
+  background: #DBEAFE;
+}
