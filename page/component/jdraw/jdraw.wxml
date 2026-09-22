@@ -30,10 +30,6 @@
       <view class="tool-icon image-icon"></view>
       <view class="tool-label">插图</view>
     </view>
-    <view class="tool" bindtap="drawBack">
-      <view class="tool-icon undo-icon"></view>
-      <view class="tool-label">撤销</view>
-    </view>
     <view class="tool" bindtap="saveBoard">
       <view class="tool-icon save-icon"></view>
       <view class="tool-label">保存</view>
@@ -45,6 +41,38 @@
     <view class="tool help-tool {{showTutorialDot ? 'help-tool-dot' : ''}}" bindtap="openTutorial">
       <view class="tool-icon help-icon"></view>
       <view class="tool-label">说明</view>
+    </view>
+  </view>
+
+  <view class="editing-bar">
+    <view class="history-tools">
+      <button class="edit-action" bindtap="drawBack" disabled="{{!canUndo}}" aria-label="还原最近一次操作">
+        <view class="tool-icon undo-icon"></view>
+        <text>还原</text>
+      </button>
+      <button class="edit-action" bindtap="drawRedo" disabled="{{!canRedo}}" aria-label="重做">
+        <view class="tool-icon undo-icon redo-icon"></view>
+        <text>重做</text>
+      </button>
+      <button wx:if="{{currentMode === 'select' && activeObjectId}}" class="edit-action delete-action" bindtap="deleteSelected" aria-label="删除选中对象">
+        <view class="tool-icon delete-icon"></view>
+        <text>删除</text>
+      </button>
+    </view>
+    <view wx:if="{{draftStatus}}" class="draft-status {{draftStatus === 'error' ? 'draft-error' : ''}}">
+      {{draftStatus === 'saved' ? '草稿已保存到本机' : draftStatus === 'error' ? '草稿未保存，请手动保存' : '等待保存草稿'}}
+    </view>
+  </view>
+
+  <view wx:if="{{currentMode === 'draw' && brushState === 'c'}}" class="palette eraser-panel">
+    <view class="eraser-heading">
+      <text>橡皮大小</text>
+      <text class="eraser-hint">擦除笔迹，保留图片</text>
+    </view>
+    <view class="size-row">
+      <view class="eraser-size-dot"></view>
+      <slider class="size-slider" value="{{eraserSize}}" min="8" max="80" bindchange="eraserSizeChange" activeColor="#111827" block-color="#FFFFFF" block-size="24" backgroundColor="#E5E7EB" />
+      <view class="size-num">{{eraserSize}}px</view>
     </view>
   </view>
 
@@ -247,6 +275,7 @@
         bindtouchstart="touchstart"
         bindtouchmove="touchMove"
         bindtouchend="touchEnd"
+        bindtouchcancel="touchCancel"
         disable-scroll="true"
         hidden="{{showTutorial}}"
       ></canvas>

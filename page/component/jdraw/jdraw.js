@@ -2,6 +2,10 @@ const boardStore = require('../../../utils/boardStore');
 const fileUnlockStore = require('../../../utils/fileUnlockStore');
 const rewardedVideoAd = require('../../../utils/rewardedVideoAd');
 const share = require('../../../utils/share');
+const geometry = require('../../../utils/strokeGeometry');
+const editHistory = require('../../../utils/editHistory');
+const draftStore = require('../../../utils/draftStore');
+const boardData = require('../../../utils/boardData');
 const TUTORIAL_STORAGE_KEY = 'hasUsedNotePaint';
 const TUTORIAL_DOT_STORAGE_KEY = 'hasReadNotePaintTutorialDot';
 
@@ -112,6 +116,17 @@ function flushCanvasCompat(ctx, preserve, callback) {
 
 function isCanvas2dContext(ctx) {
   return !!(ctx && typeof ctx.draw !== 'function');
+}
+
+function getTouchPosition(touch) {
+  const value = touch || {};
+  const x = [value.x, value.clientX, value.pageX].find(item => Number.isFinite(item));
+  const y = [value.y, value.clientY, value.pageY].find(item => Number.isFinite(item));
+  return { x: Number.isFinite(x) ? x : 0, y: Number.isFinite(y) ? y : 0 };
+}
+
+function getTouchIdentifier(touch) {
+  return touch && touch.identifier !== undefined ? touch.identifier : null;
 }
 
 /** 取值 0～max → thumb-lane（两端圆帽圆心之间）上 0%～100%，与 WXSS inset 同步 */
@@ -278,6 +293,11 @@ Page({
     graphObjects: [],
     currentMode: 'draw',
     activeObjectId: null,
+    canUndo: false,
+    canRedo: false,
+    draftStatus: '',
+    isErasing: false,
+    eraserSize: 20,
 
     brushState: 'p',
     tinctList: [
@@ -355,6 +375,9 @@ Page({
   },
 
   onLoad() {
+    this.boardEpoch = 1;
+    this.changeRevision = 0;
+    this.resetHistory();
     share.enableShareMenu();
     this.saveFileAd = rewardedVideoAd.createRewardedVideoAd(rewardedVideoAd.SAVE_FILE_AD_UNIT_ID, {
       cancelMessage: '完整观看广告后才能保存更多文件',
@@ -365,10 +388,18 @@ Page({
       errorMessage: '广告暂不可用，请稍后再试'
     });
     this.initTutorialDot();
+    this.restoreDraft();
     this.consumePendingFileId(true);
   },
 
   onShow() {
+    this.pageHidden = false;
+    // A system back gesture may hide the page without delivering a final
+    // touchend. Do not let its ignore flag swallow the first touch on return.
+    this.touchSession = null;
+    this.edgeBackActive = false;
+    this.touchSessionCancelled = false;
+    this.ignoreSingleTouch = false;
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({
         selected: 0,
@@ -376,6 +407,7 @@ Page({
       });
     }
     this.consumePendingFileId(false);
+    if (this.context) this.requestCanvasDraw();
   },
 
   onShareAppMessage() {
@@ -386,7 +418,24 @@ Page({
     return share.getTimelineInfo();
   },
 
+  onHide() {
+    this.pageHidden = true;
+    if (this.hasActiveTouch()) {
+      if (this.edgeBackActive || this.touchSessionCancelled) this.cancelGestureEdit();
+      else {
+        this.finishGestureEdit();
+        this.resetTouchState(false);
+      }
+    }
+    this.flushDraft();
+    this.cancelCanvasDraw();
+    if (this.scaleToastTimer) clearTimeout(this.scaleToastTimer);
+    if (this.tutorialTimer) clearTimeout(this.tutorialTimer);
+  },
+
   onUnload() {
+    this.onHide();
+    this.unloaded = true;
     if (this.saveFileAd && this.saveFileAd.destroy) this.saveFileAd.destroy();
     if (this.exportImageAd && this.exportImageAd.destroy) this.exportImageAd.destroy();
   },
@@ -419,7 +468,7 @@ Page({
       .in(this)
       .select('#palette')
       .fields({ node: true, size: true }, res => {
-        if (!res || !res.node) return;
+        if (this.unloaded || !res || !res.node) return;
         this.mainCanvas = res.node;
         this.imageNodeCache = {};
         this.context = res.node.getContext('2d');
@@ -465,14 +514,14 @@ Page({
   },
 
   clearMainCanvas() {
-    if (!this.context) return;
+    if (!this.context || typeof this.context.clearRect !== 'function') return;
     this.syncMainCanvasSize();
     this.context.clearRect(0, 0, this.data.viewportWidth, this.data.viewportHeight);
   },
 
   getImageDrawSource(src, callback) {
     if (!src || !this.mainCanvas) {
-      callback(src || '');
+      callback('');
       return;
     }
     if (!isCanvas2dContext(this.context)) {
@@ -480,16 +529,26 @@ Page({
       return;
     }
     this.imageNodeCache = this.imageNodeCache || {};
-    if (this.imageNodeCache[src]) {
-      callback(this.imageNodeCache[src]);
+    if (Object.prototype.hasOwnProperty.call(this.imageNodeCache, src)) {
+      callback(this.imageNodeCache[src] || '');
       return;
     }
+    this.imageLoads = this.imageLoads || {};
+    if (this.imageLoads[src]) {
+      this.imageLoads[src].push(callback);
+      return;
+    }
+    this.imageLoads[src] = [callback];
     const img = this.mainCanvas.createImage();
-    img.onload = () => {
-      this.imageNodeCache[src] = img;
-      callback(img);
+    const finish = source => {
+      const callbacks = this.imageLoads[src] || [];
+      delete this.imageLoads[src];
+      if (this.unloaded) return;
+      this.imageNodeCache[src] = source;
+      callbacks.forEach(done => done(source));
     };
-    img.onerror = () => callback('');
+    img.onload = () => finish(img);
+    img.onerror = () => finish('');
     img.src = src;
   },
 
@@ -521,6 +580,7 @@ Page({
         fileName: '',
         hasChanges: this.data.graphObjects.length > 0
       });
+      if (this.data.hasChanges) this.markChanged();
       return;
     }
 
@@ -531,7 +591,7 @@ Page({
 
     app.globalData.pendingFileId = '';
 
-    if (!isLoad && this.data.hasChanges) {
+    if (this.data.hasChanges) {
       this.confirmDiscardAndLoad(pending);
     } else {
       this.loadBoardFile(pending);
@@ -558,7 +618,15 @@ Page({
       wx.showToast({ title: '画板文件不存在', icon: 'none' });
       return;
     }
-    const data = file.data || {};
+    if (!this.discardDraft()) return;
+    this.boardEpoch++;
+    this.resetHistory();
+    this.applyBoardData(file.data, { currentFileId: file.id, fileName: file.name || '', hasChanges: false, draftStatus: '', isSavingBoard: false });
+  },
+
+  applyBoardData(input, extra) {
+    const normalized = boardData.normalizeBoard(input, true);
+    const data = normalized.data;
     const savedTinctCurr = typeof data.tinctCurr === 'number' ? data.tinctCurr : 0;
     const savedCustomColor = data.customColor || '';
     const savedTinctList = this.data.tinctList || [];
@@ -585,9 +653,6 @@ Page({
         translateY: data.translateY
       };
     this.setData(Object.assign({
-      currentFileId: file.id,
-      fileName: file.name || '',
-      hasChanges: false,
       graphObjects,
       canvasBounds: data.canvasBounds || { minX: 0, maxX: 800, minY: 0, maxY: 1000 },
       canvasWidth,
@@ -595,24 +660,33 @@ Page({
       brushState: data.brushState || 'p',
       tinctCurr: savedTinctCurr,
       tinctSize: data.tinctSize || 3,
+      eraserSize: data.eraserSize || 20,
       customColor: savedCustomColor,
       currentPenIconColor: this.getPenIconColor(savedPenColor),
       currentMode: data.currentMode || 'draw',
-      activeObjectId: null
-    }, viewState), () => {
+      activeObjectId: null,
+      isDrawing: false, isErasing: false, isDraggingObject: false, isZooming: false, isPanning: false
+    }, viewState, extra || {}), () => {
       const app = getApp();
-      if (app && app.globalData) app.globalData.currentEditingFileId = file.id;
+      if (app && app.globalData) app.globalData.currentEditingFileId = this.data.currentFileId;
       if (this.context) this.redrawCanvas();
     });
+    if (normalized.dropped) wx.showToast({ title: '部分图片或笔迹无法恢复', icon: 'none' });
   },
 
-  applyEmptyBoard() {
+  applyEmptyBoard(name) {
+    if (!this.discardDraft()) return;
+    this.boardEpoch++;
+    this.resetHistory();
     const viewState = this.getCenteredCanvasViewState(800, 1000, 1);
     this.clearMainCanvas();
     this.setData(Object.assign({
       currentFileId: '',
-      fileName: '',
+      fileName: typeof name === 'string' ? name : '',
       hasChanges: false,
+      draftStatus: '',
+      isSavingBoard: false,
+      isDrawing: false, isErasing: false, isDraggingObject: false, isZooming: false, isPanning: false,
       graphObjects: [],
       canvasBounds: { minX: 0, maxX: 800, minY: 0, maxY: 1000 },
       canvasWidth: 800,
@@ -627,21 +701,157 @@ Page({
   },
 
   markChanged() {
-    if (!this.data.hasChanges) {
-      this.setData({ hasChanges: true });
+    this.changeRevision = (this.changeRevision || 0) + 1;
+    this.setData({ hasChanges: true, draftStatus: 'pending' });
+    this.scheduleDraft();
+  },
+
+  resetHistory() {
+    this.history = editHistory.createHistory(60);
+    this.editBefore = null;
+    this.pendingCanvasBoundsData = null;
+    this.activePath = null;
+    this.lastEraserPoint = null;
+    this.ignoreSingleTouch = false;
+    this.touchSession = null;
+    this.edgeBackActive = false;
+    this.touchSessionCancelled = false;
+    this.setData({ canUndo: false, canRedo: false });
+  },
+
+  captureEditState() {
+    return {
+      objects: this.data.graphObjects.slice(), bounds: Object.assign({}, this.data.canvasBounds),
+      scale: this.data.scale, translateX: this.data.translateX, translateY: this.data.translateY,
+      activeObjectId: this.data.activeObjectId,
+      hasChanges: this.data.hasChanges,
+      draftStatus: this.data.draftStatus
+    };
+  },
+
+  restoreEditState(state) {
+    if (!state) return;
+    const bounds = Object.assign({}, state.bounds);
+    this.setData({
+      graphObjects: state.objects.slice(),
+      canvasBounds: bounds,
+      canvasWidth: bounds.maxX - bounds.minX,
+      canvasHeight: bounds.maxY - bounds.minY,
+      scale: state.scale,
+      scalePercent: Math.round(state.scale * 100),
+      translateX: state.translateX,
+      translateY: state.translateY,
+      activeObjectId: state.activeObjectId || null,
+      hasChanges: !!state.hasChanges,
+      draftStatus: state.draftStatus || ''
+    });
+  },
+
+  beginEdit() {
+    if (!this.editBefore) this.editBefore = this.captureEditState();
+  },
+
+  commitEdit() {
+    if (!this.editBefore) return;
+    const changed = this.history.push(this.editBefore, this.captureEditState());
+    this.editBefore = null;
+    this.setData(this.history.state());
+    if (changed) this.markChanged();
+  },
+
+  applyHistoryState(state) {
+    if (!state) return;
+    const bounds = Object.assign({}, state.bounds);
+    this.setData(Object.assign({
+      graphObjects: state.objects.slice(), canvasBounds: bounds,
+      canvasWidth: bounds.maxX - bounds.minX, canvasHeight: bounds.maxY - bounds.minY,
+      scale: state.scale, scalePercent: Math.round(state.scale * 100),
+      translateX: state.translateX, translateY: state.translateY, activeObjectId: null
+    }, this.history.state()));
+    this.redrawCanvas();
+    this.markChanged();
+  },
+
+  scheduleDraft() {
+    if (this.draftTimer) clearTimeout(this.draftTimer);
+    this.draftTimer = null;
+    if (!this.data.hasChanges || this.unloaded || this.pageHidden) return;
+    this.draftTimer = setTimeout(() => {
+      this.draftTimer = null;
+      if (this.data.isDrawing || this.data.isErasing || this.data.isDraggingObject || this.data.isZooming || this.data.isPanning) {
+        this.scheduleDraft();
+      } else this.flushDraft();
+    }, 1000);
+  },
+
+  flushDraft() {
+    if (this.draftTimer) clearTimeout(this.draftTimer);
+    this.draftTimer = null;
+    if (!this.data.hasChanges) return;
+    const result = draftStore.write({
+      currentFileId: this.data.currentFileId, fileName: this.data.fileName,
+      data: this.buildBoardData()
+    });
+    this.setData({ draftStatus: result.ok ? 'saved' : 'error' });
+    if (!result.ok && !this.draftErrorShown) {
+      wx.showToast({ title: '草稿暂未保存，请及时手动保存', icon: 'none' });
+      this.draftErrorShown = true;
     }
+    if (result.ok) this.draftErrorShown = false;
+  },
+
+  discardDraft() {
+    const result = draftStore.clear();
+    if (!result.ok) {
+      wx.showToast({ title: '暂时无法清理草稿，请稍后重试', icon: 'none' });
+      return false;
+    }
+    if (this.draftTimer) clearTimeout(this.draftTimer);
+    this.draftTimer = null;
+    this.pendingCanvasBoundsData = null;
+    return true;
+  },
+
+  restoreDraft() {
+    const result = draftStore.read();
+    if (result.error) {
+      wx.showToast({ title: '上次草稿无法恢复', icon: 'none' });
+      return;
+    }
+    if (!result.draft) return;
+    const draft = result.draft;
+    const fileId = draft.currentFileId && boardStore.getFile(draft.currentFileId) ? draft.currentFileId : '';
+    this.restoredDraft = true;
+    this.applyBoardData(draft.data, {
+      currentFileId: fileId, fileName: draft.fileName || '', hasChanges: true, draftStatus: 'saved'
+    });
+    wx.showToast({ title: '已恢复上次草稿', icon: 'none' });
+  },
+
+  requestCanvasDraw() {
+    if (this.renderTimer || this.pageHidden || this.unloaded) return;
+    this.renderTimer = setTimeout(() => {
+      this.renderTimer = null;
+      if (!this.pageHidden && !this.unloaded) this.redrawCanvas();
+    }, 16);
+  },
+
+  cancelCanvasDraw() {
+    if (this.renderTimer) clearTimeout(this.renderTimer);
+    this.renderTimer = null;
   },
 
   // ---------- 新建画板 ----------
 
-  createNewBoard() {
+  createNewBoard(name) {
+    const title = typeof name === 'string' ? name : '';
     const hasContent = (this.data.graphObjects && this.data.graphObjects.length > 0) || !!this.data.currentFileId;
     if (!hasContent) {
-      this.applyEmptyBoard();
+      this.applyEmptyBoard(title);
       return;
     }
     if (!this.data.hasChanges) {
-      this.applyEmptyBoard();
+      this.applyEmptyBoard(title);
       return;
     }
     wx.showModal({
@@ -651,7 +861,7 @@ Page({
       cancelText: '取消',
       confirmColor: '#2563EB',
       success: res => {
-        if (res.confirm) this.applyEmptyBoard();
+        if (res.confirm) this.applyEmptyBoard(title);
       }
     });
   },
@@ -745,6 +955,7 @@ Page({
       brushState: 'p',
       currentMode: 'draw'
     }));
+    this.scheduleDraft();
   },
 
   onGridColorPick(e) {
@@ -865,10 +1076,11 @@ Page({
   // ---------- 首次使用 ----------
 
   checkFirstTimeUser() {
+    if (this.restoredDraft) return;
     try {
       if (!wx.getStorageSync(TUTORIAL_STORAGE_KEY)) {
-        setTimeout(() => {
-          this.showTutorialModal();
+        this.tutorialTimer = setTimeout(() => {
+          if (!this.unloaded && !this.pageHidden) this.showTutorialModal();
         }, 500);
       }
     } catch (e) {
@@ -937,8 +1149,10 @@ Page({
   },
 
   getDistance(t1, t2) {
-    const dx = t1.x - t2.x;
-    const dy = t1.y - t2.y;
+    const first = getTouchPosition(t1);
+    const second = getTouchPosition(t2);
+    const dx = first.x - second.x;
+    const dy = first.y - second.y;
     return Math.sqrt(dx * dx + dy * dy);
   },
 
@@ -975,224 +1189,241 @@ Page({
 
   // ---------- 触摸事件 ----------
 
-  touchstart(e) {
-    if (this.data.showColorPicker || this.data.showTutorial) return;
-    if (!this.context) return;
-    const touches = e.touches;
-    if (touches.length === 1) {
-      const touch = touches[0];
-      if (this.data.currentMode === 'select') {
-        const canvasPos = this.screenToCanvas(touch.x, touch.y);
-        let found = false;
-        const objects = this.data.graphObjects;
-        for (let i = objects.length - 1; i >= 0; i--) {
-          const obj = objects[i];
-          const box = obj.itemBox;
-          if (canvasPos.x >= box.minX + (obj.x || 0) && canvasPos.x <= box.maxX + (obj.x || 0) &&
-              canvasPos.y >= box.minY + (obj.y || 0) && canvasPos.y <= box.maxY + (obj.y || 0)) {
-            this.setData({
-              activeObjectId: obj.id,
-              isDraggingObject: true,
-              lastDragPoint: { x: touch.x, y: touch.y }
-            });
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          this.setData({
-            activeObjectId: null,
-            isDraggingObject: false,
-            isPanning: true,
-            lastPanPoint: { x: touch.x, y: touch.y }
-          });
-        }
-        this.redrawCanvas();
-        return;
-      }
-
-      let tinct, lineWidth;
-      const brushState = this.data.brushState || 'p';
-      if (brushState === 'p') {
-        tinct = this.getCurrentColor();
-        lineWidth = this.data.tinctSize || 3;
-      } else {
-        tinct = '#ffffff';
-        lineWidth = 20;
-      }
-
-      setStrokeStyleCompat(this.context, tinct);
-      setLineWidthCompat(this.context, lineWidth);
-      setLineCapCompat(this.context, 'round');
-      setLineJoinCompat(this.context, 'round');
-
-      const canvasPos = this.screenToCanvas(touch.x, touch.y);
-      this.setData({ isDrawing: true });
-
-      const newPath = {
-        id: 'path_' + Date.now(),
-        type: 'path',
-        x: 0, y: 0,
-        points: [canvasPos],
-        style: { color: tinct, width: lineWidth },
-        itemBox: {
-          minX: canvasPos.x, maxX: canvasPos.x,
-          minY: canvasPos.y, maxY: canvasPos.y
-        }
-      };
-      this.data.graphObjects.push(newPath);
-      this.expandCanvasBounds(canvasPos.x, canvasPos.y, true);
-    } else if (touches.length === 2) {
-      const centerX = (touches[0].x + touches[1].x) / 2;
-      const centerY = (touches[0].y + touches[1].y) / 2;
-      this.setData({
-        isDrawing: false,
-        isZooming: true,
-        lastTouchDistance: this.getDistance(touches[0], touches[1]),
-        lastPanPoint: { x: centerX, y: centerY }
-      });
-    }
+  hasActiveTouch() {
+    return !!(this.editBefore || this.touchSession || this.data.isDrawing || this.data.isErasing ||
+      this.data.isDraggingObject || this.data.isPanning || this.data.isZooming);
   },
 
-  touchMove(e) {
-    if (this.data.showColorPicker || this.data.showTutorial) return;
-    if (!this.context) return;
-    const touches = e.touches;
-    if (this.data.currentMode === 'select' && this.data.isDraggingObject && touches.length === 1 && this.data.activeObjectId) {
-      const touch = touches[0];
-      const dxs = touch.x - this.data.lastDragPoint.x;
-      const dys = touch.y - this.data.lastDragPoint.y;
-      const dxc = dxs / this.data.scale;
-      const dyc = dys / this.data.scale;
-      const obj = this.data.graphObjects.find(o => o.id === this.data.activeObjectId);
-      if (obj) {
-        obj.x = (obj.x || 0) + dxc;
-        obj.y = (obj.y || 0) + dyc;
-        this.setData({ lastDragPoint: { x: touch.x, y: touch.y } });
-        this.redrawCanvas();
-      }
-      return;
-    }
-
-    if (this.data.isDrawing && touches.length === 1) {
-      const touch = touches[0];
-      const canvasPos = this.screenToCanvas(touch.x, touch.y);
-      const objects = this.data.graphObjects;
-      const cur = objects[objects.length - 1];
-      if (cur && cur.type === 'path') {
-        const last = cur.points[cur.points.length - 1];
-        const dx = canvasPos.x - last.x;
-        const dy = canvasPos.y - last.y;
-        if (dx * dx + dy * dy < 4) return;
-        cur.points.push(canvasPos);
-        cur.itemBox.minX = Math.min(cur.itemBox.minX, canvasPos.x);
-        cur.itemBox.maxX = Math.max(cur.itemBox.maxX, canvasPos.x);
-        cur.itemBox.minY = Math.min(cur.itemBox.minY, canvasPos.y);
-        cur.itemBox.maxY = Math.max(cur.itemBox.maxY, canvasPos.y);
-        this.expandCanvasBounds(canvasPos.x, canvasPos.y, true);
-        this.bindDraw(cur);
-      }
-    } else if (this.data.isZooming && touches.length === 2) {
-      const currentDistance = this.getDistance(touches[0], touches[1]);
-      const scaleChange = currentDistance / this.data.lastTouchDistance;
-      let newScale = Math.max(0.05, this.data.scale * scaleChange);
-      const centerX = (touches[0].x + touches[1].x) / 2;
-      const centerY = (touches[0].y + touches[1].y) / 2;
-      const moveX = centerX - this.data.lastPanPoint.x;
-      const moveY = centerY - this.data.lastPanPoint.y;
-      let newTx = centerX - (centerX - this.data.translateX) * (newScale / this.data.scale);
-      let newTy = centerY - (centerY - this.data.translateY) * (newScale / this.data.scale);
-      newTx += moveX;
-      newTy += moveY;
-      this.data.scale = newScale;
-      this.data.translateX = newTx;
-      this.data.translateY = newTy;
-      this.data.lastTouchDistance = currentDistance;
-      this.data.lastPanPoint = { x: centerX, y: centerY };
-      const newPercent = Math.round(newScale * 100);
-      if (this.scaleToastTimer) {
-        clearTimeout(this.scaleToastTimer);
-        this.scaleToastTimer = null;
-      }
-      if (newPercent !== this.data.scalePercent) {
-        this.setData({ scalePercent: newPercent, showScaleToast: true });
-      } else if (!this.data.showScaleToast) {
-        this.setData({ showScaleToast: true });
-      }
-      const now = Date.now();
-      if (now - (this.lastRenderTime || 0) > 20) {
-        this.redrawCanvas();
-        this.lastRenderTime = now;
-      }
-    } else if (this.data.isPanning && touches.length === 1) {
-      const touch = touches[0];
-      if (this.data.lastPanPoint) {
-        const dX = touch.x - this.data.lastPanPoint.x;
-        const dY = touch.y - this.data.lastPanPoint.y;
-        this.setData({
-          translateX: this.data.translateX + dX,
-          translateY: this.data.translateY + dY,
-          lastPanPoint: { x: touch.x, y: touch.y }
-        });
-        this.redrawCanvas();
-      }
-    }
-  },
-
-  touchEnd() {
-    if (this.data.showColorPicker || this.data.showTutorial) return;
-    if (!this.context) return;
-    const changed = this.data.isDrawing || this.data.isDraggingObject;
-    const wasZooming = this.data.isZooming;
-    const pendingCanvasBoundsData = this.pendingCanvasBoundsData || {};
+  resetTouchState(showScaleToast) {
+    const keepScaleToast = !!showScaleToast;
+    this.touchSession = null;
+    this.edgeBackActive = false;
+    this.touchSessionCancelled = false;
+    this.activePath = null;
+    this.lastEraserPoint = null;
     this.pendingCanvasBoundsData = null;
-    const nextData = Object.assign({}, pendingCanvasBoundsData, {
+    this.setData({
       isDrawing: false,
+      isErasing: false,
       isPanning: false,
       isZooming: false,
       isDraggingObject: false,
       lastPanPoint: null,
-      lastTouchDistance: 0
+      lastDragPoint: null,
+      lastTouchDistance: 0,
+      showScaleToast: keepScaleToast
     });
-    if (!wasZooming) nextData.showScaleToast = false;
-    this.setData(nextData);
-    if (wasZooming) {
+  },
+
+  beginTouchSession(touch) {
+    const position = getTouchPosition(touch);
+    this.touchSession = {
+      identifier: getTouchIdentifier(touch),
+      start: position,
+      last: position,
+      // Keep the guard narrow enough that a normal horizontal stroke beginning
+      // near the canvas edge still works; iOS edge-back starts within roughly
+      // the first 16px and produces a short rightward move first.
+      edgeCandidate: position.x <= 16
+    };
+    this.edgeBackActive = false;
+    this.touchSessionCancelled = false;
+  },
+
+  maybeStartEdgeBackGesture(touch) {
+    const session = this.touchSession;
+    if (!session || session.edgeBackActive || !session.edgeCandidate) return false;
+    const position = getTouchPosition(touch);
+    const dx = position.x - session.start.x;
+    const dy = position.y - session.start.y;
+    session.last = position;
+    if (dx >= 12 && dx <= 36 && dx > Math.abs(dy) * 1.2) {
+      this.edgeBackActive = true;
+      session.edgeBackActive = true;
+      this.cancelGestureEdit();
+      this.ignoreSingleTouch = true;
+      return true;
+    }
+    return false;
+  },
+
+  cancelGestureEdit() {
+    const before = this.editBefore;
+    if (before) this.restoreEditState(before);
+    this.editBefore = null;
+    this.touchSessionCancelled = true;
+    this.resetTouchState(false);
+    this.ignoreSingleTouch = true;
+    this.cancelCanvasDraw();
+    this.redrawCanvas();
+  },
+
+  touchstart(e) {
+    if (this.data.showColorPicker || this.data.showTutorial || !this.context) return;
+    const touches = e.touches || [];
+    if (touches.length >= 2) {
+      this.finishGestureEdit();
+      const first = getTouchPosition(touches[0]);
+      const second = getTouchPosition(touches[1]);
+      this.touchSession = null;
+      this.ignoreSingleTouch = true;
+      this.setData({
+        isDrawing: false, isErasing: false, isDraggingObject: false, isPanning: false, isZooming: true,
+        lastTouchDistance: Math.max(this.getDistance(touches[0], touches[1]), 1),
+        lastPanPoint: { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 }
+      });
+      return;
+    }
+    if (touches.length !== 1 || this.ignoreSingleTouch) return;
+    const touch = touches[0];
+    const position = getTouchPosition(touch);
+    const point = this.screenToCanvas(position.x, position.y);
+    this.beginTouchSession(touch);
+    if (this.data.currentMode === 'select') {
+      const objects = this.data.graphObjects;
+      const hit = objects.slice().reverse().find(object => geometry.hitTest(object, point, 8 / this.data.scale));
+      this.setData({
+        activeObjectId: hit ? hit.id : null,
+        isDraggingObject: !!hit, isPanning: !hit,
+        lastDragPoint: { x: position.x, y: position.y },
+        lastPanPoint: hit ? null : { x: position.x, y: position.y }
+      });
+      if (hit) this.beginEdit();
+      this.redrawCanvas();
+      return;
+    }
+    this.beginEdit();
+    this.setData({ activeObjectId: null });
+    if (this.data.brushState === 'c') {
+      this.setData({ isErasing: true });
+      this.lastEraserPoint = point;
+      this.eraseTo(point);
+      return;
+    }
+    const newPath = {
+      id: 'path_' + boardStore.uuidv4(), type: 'path', smooth: true,
+      x: 0, y: 0, points: [point],
+      style: { color: this.getCurrentColor(), width: this.data.tinctSize || 3 },
+      itemBox: geometry.bounds([point])
+    };
+    this.activePath = newPath;
+    this.data.graphObjects.push(newPath);
+    this.setData({ isDrawing: true });
+    this.expandCanvasBounds(point.x, point.y, true);
+    this.requestCanvasDraw();
+  },
+
+  eraseTo(point) {
+    const from = this.lastEraserPoint || point;
+    this.data.graphObjects = geometry.eraseObjects(this.data.graphObjects, from, point, this.data.eraserSize / 2);
+    this.lastEraserPoint = point;
+    this.requestCanvasDraw();
+  },
+
+  appendStrokePoint(touch, force) {
+    const path = this.activePath;
+    if (!path || !touch) return;
+    const position = getTouchPosition(touch);
+    const point = this.screenToCanvas(position.x, position.y);
+    const last = path.points[path.points.length - 1];
+    const distance = Math.hypot(point.x - last.x, point.y - last.y);
+    if (distance < (force ? 0.01 : 0.8 / this.data.scale)) return;
+    path.points.push(point);
+    path.itemBox.minX = Math.min(path.itemBox.minX, point.x);
+    path.itemBox.maxX = Math.max(path.itemBox.maxX, point.x);
+    path.itemBox.minY = Math.min(path.itemBox.minY, point.y);
+    path.itemBox.maxY = Math.max(path.itemBox.maxY, point.y);
+    this.expandCanvasBounds(point.x, point.y, true);
+    this.requestCanvasDraw();
+  },
+
+  touchMove(e) {
+    if (this.data.showColorPicker || this.data.showTutorial || !this.context) return;
+    const touches = e.touches || [];
+    if (touches.length >= 2 && !this.data.isZooming) {
+      this.touchstart(e);
+      return;
+    }
+    if (this.data.isZooming && touches.length >= 2) {
+      const distance = Math.max(this.getDistance(touches[0], touches[1]), 1);
+      const oldScale = this.data.scale;
+      const scale = Math.max(0.05, Math.min(20, oldScale * distance / this.data.lastTouchDistance));
+      const center = { x: (touches[0].x + touches[1].x) / 2, y: (touches[0].y + touches[1].y) / 2 };
+      const previous = this.data.lastPanPoint;
+      Object.assign(this.data, {
+        scale,
+        translateX: center.x - (previous.x - this.data.translateX) * scale / oldScale,
+        translateY: center.y - (previous.y - this.data.translateY) * scale / oldScale,
+        lastTouchDistance: distance, lastPanPoint: center
+      });
+      this.setData({ scalePercent: Math.round(scale * 100), showScaleToast: true });
+      this.requestCanvasDraw();
+      return;
+    }
+    if (touches.length !== 1 || this.ignoreSingleTouch) return;
+    const touch = touches[0];
+    if (this.maybeStartEdgeBackGesture(touch)) return;
+    const position = getTouchPosition(touch);
+    if (this.data.isDraggingObject && this.data.activeObjectId) {
+      const dx = (position.x - this.data.lastDragPoint.x) / this.data.scale;
+      const dy = (position.y - this.data.lastDragPoint.y) / this.data.scale;
+      const index = this.data.graphObjects.findIndex(object => object.id === this.data.activeObjectId);
+      if (index >= 0 && (dx || dy)) {
+        const old = this.data.graphObjects[index];
+        const object = Object.assign({}, old, { x: (old.x || 0) + dx, y: (old.y || 0) + dy });
+        this.data.graphObjects[index] = object;
+        this.expandCanvasBounds(object.x + object.itemBox.minX, object.y + object.itemBox.minY, true);
+        this.expandCanvasBounds(object.x + object.itemBox.maxX, object.y + object.itemBox.maxY, true);
+        this.data.lastDragPoint = { x: position.x, y: position.y };
+        this.requestCanvasDraw();
+      }
+    } else if (this.data.isDrawing) {
+      this.appendStrokePoint(touch, false);
+    } else if (this.data.isErasing) {
+      this.eraseTo(this.screenToCanvas(position.x, position.y));
+    } else if (this.data.isPanning && this.data.lastPanPoint) {
+      this.data.translateX += position.x - this.data.lastPanPoint.x;
+      this.data.translateY += position.y - this.data.lastPanPoint.y;
+      this.data.lastPanPoint = { x: position.x, y: position.y };
+      this.requestCanvasDraw();
+    }
+  },
+
+  finishGestureEdit() {
+    if (this.pendingCanvasBoundsData) {
+      this.setData(this.pendingCanvasBoundsData);
+      this.pendingCanvasBoundsData = null;
+    }
+    this.commitEdit();
+    this.activePath = null;
+    this.lastEraserPoint = null;
+  },
+
+  touchEnd(e) {
+    const wasZooming = this.data.isZooming;
+    this.finishGestureEdit();
+    this.ignoreSingleTouch = !!(e && e.touches && e.touches.length);
+    this.resetTouchState(wasZooming);
+    this.cancelCanvasDraw();
+    this.redrawCanvas();
+    this.scheduleDraft();
+    if (wasZooming && !this.pageHidden) {
       if (this.scaleToastTimer) clearTimeout(this.scaleToastTimer);
       this.scaleToastTimer = setTimeout(() => {
         this.scaleToastTimer = null;
-        this.setData({ showScaleToast: false });
+        if (!this.unloaded) this.setData({ showScaleToast: false });
       }, 250);
     }
-    if (changed) this.markChanged();
+  },
+
+  touchCancel() {
+    this.cancelGestureEdit();
   },
 
   // ---------- 绘制 ----------
 
-  bindDraw(path) {
-    const points = path && path.points;
-    if (!points || points.length < 1) return;
-    this.syncMainCanvasSize();
-    const offset = this.getCanvasContentOffset();
-    this.context.save();
-    if (path.style) {
-      setStrokeStyleCompat(this.context, path.style.color);
-      setLineWidthCompat(this.context, path.style.width);
-    }
-    setLineCapCompat(this.context, 'round');
-    setLineJoinCompat(this.context, 'round');
-    this.context.scale(this.data.scale, this.data.scale);
-    this.context.translate(
-      this.data.translateX / this.data.scale + offset.x,
-      this.data.translateY / this.data.scale + offset.y
-    );
-    this.context.beginPath();
-    this.context.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      this.context.lineTo(points[i].x, points[i].y);
-    }
-    this.context.stroke();
-    this.context.restore();
-    flushCanvasCompat(this.context, true);
+  bindDraw() {
+    this.requestCanvasDraw();
   },
 
   renderToContext(ctx, width, height, scale, tx, ty, isExport, contentOffset) {
@@ -1234,7 +1465,7 @@ Page({
   },
 
   redrawCanvas() {
-    if (!this.context) return;
+    if (!this.context || typeof this.context.clearRect !== 'function' || this.unloaded) return;
     this.syncMainCanvasSize();
     const offset = this.getCanvasContentOffset();
     const asyncImageTasks = this.renderToContext(
@@ -1253,7 +1484,7 @@ Page({
       const done = loaded => {
         shouldRedraw = shouldRedraw || !!loaded;
         pending--;
-        if (pending <= 0 && shouldRedraw) this.redrawCanvas();
+        if (pending <= 0 && shouldRedraw) this.requestCanvasDraw();
       };
       asyncImageTasks.forEach(task => task(done));
     }
@@ -1262,18 +1493,7 @@ Page({
 
   drawObject(ctx, obj, hideSelection, asyncImageTasks) {
     if (obj.type === 'path') {
-      if (obj.points.length > 0) {
-        setStrokeStyleCompat(ctx, obj.style.color);
-        setLineWidthCompat(ctx, obj.style.width);
-        setLineCapCompat(ctx, 'round');
-        setLineJoinCompat(ctx, 'round');
-        ctx.beginPath();
-        ctx.moveTo(obj.points[0].x + (obj.x || 0), obj.points[0].y + (obj.y || 0));
-        for (let j = 1; j < obj.points.length; j++) {
-          ctx.lineTo(obj.points[j].x + (obj.x || 0), obj.points[j].y + (obj.y || 0));
-        }
-        ctx.stroke();
-      }
+      geometry.drawPath(ctx, obj);
     } else if (obj.type === 'image') {
       if (isCanvas2dContext(ctx)) {
         const cached = this.imageNodeCache && this.imageNodeCache[obj.src];
@@ -1306,18 +1526,24 @@ Page({
   // ---------- 工具栏 ----------
 
   switchMode(e) {
+    this.touchEnd();
     this.setData({
       currentMode: e.currentTarget.dataset.mode,
       activeObjectId: null
     });
     this.redrawCanvas();
+    this.scheduleDraft();
   },
 
   switchBrush(e) {
+    this.touchEnd();
     this.setData({
       currentMode: 'draw',
-      brushState: e.currentTarget.dataset.state
+      brushState: e.currentTarget.dataset.state,
+      activeObjectId: null
     });
+    this.redrawCanvas();
+    this.scheduleDraft();
   },
 
   tinColorChange(e) {
@@ -1329,10 +1555,17 @@ Page({
       brushState: 'p',
       currentMode: 'draw'
     });
+    this.scheduleDraft();
   },
 
   tinSizechange(e) {
     this.setData({ tinctSize: e.detail.value });
+    this.scheduleDraft();
+  },
+
+  eraserSizeChange(e) {
+    this.setData({ eraserSize: Math.max(8, Math.min(80, Number(e.detail.value) || 20)) });
+    this.scheduleDraft();
   },
 
   adjustSize(e) {
@@ -1341,14 +1574,28 @@ Page({
     if (next < 1) next = 1;
     if (next > 10) next = 10;
     this.setData({ tinctSize: next });
+    this.scheduleDraft();
   },
 
   drawBack() {
-    if (this.data.graphObjects.length === 0) return;
-    this.data.graphObjects.pop();
+    this.touchEnd();
+    this.applyHistoryState(this.history.undo());
+  },
+
+  drawRedo() {
+    this.touchEnd();
+    this.applyHistoryState(this.history.redo());
+  },
+
+  deleteSelected() {
+    this.touchEnd();
+    const id = this.data.activeObjectId;
+    if (!id || !this.data.graphObjects.some(object => object.id === id)) return;
+    this.beginEdit();
+    this.data.graphObjects = this.data.graphObjects.filter(object => object.id !== id);
     this.setData({ activeObjectId: null });
+    this.commitEdit();
     this.redrawCanvas();
-    this.markChanged();
   },
 
   drawClear() {
@@ -1365,6 +1612,8 @@ Page({
   },
 
   doClearCanvas() {
+    this.touchEnd();
+    this.beginEdit();
     const viewState = this.getCenteredCanvasViewState(800, 1000, 1);
     this.clearMainCanvas();
     this.setData(Object.assign({
@@ -1374,11 +1623,12 @@ Page({
       canvasWidth: 800,
       canvasHeight: 1000
     }, viewState));
-    this.markChanged();
+    this.commitEdit();
   },
 
   chooseImage() {
     const that = this;
+    const epoch = this.boardEpoch;
     wx.chooseImage({
       count: 1,
       sourceType: ['album', 'camera'],
@@ -1388,6 +1638,12 @@ Page({
           src: tempFilePath,
           success: info => {
             that.persistTempFile(tempFilePath, savedPath => {
+              if (that.unloaded || epoch !== that.boardEpoch) return;
+              if (!savedPath) {
+                wx.showToast({ title: '图片保存失败，请重试', icon: 'none' });
+                return;
+              }
+              that.touchEnd();
               const ratio = info.width / info.height;
               const w = 200;
               const h = 200 / (ratio || 1);
@@ -1395,7 +1651,7 @@ Page({
               const cy = that.data.screenHeight / 2;
               const canvasPos = that.screenToCanvas(cx, cy);
               const newImg = {
-                id: 'img_' + Date.now(),
+                id: 'img_' + boardStore.uuidv4(),
                 type: 'image',
                 src: savedPath || tempFilePath,
                 x: canvasPos.x - w / 2,
@@ -1404,11 +1660,12 @@ Page({
                 h: h,
                 itemBox: { minX: 0, maxX: w, minY: 0, maxY: h }
               };
+              that.beginEdit();
               that.data.graphObjects.push(newImg);
               that.expandCanvasBounds(newImg.x, newImg.y);
               that.expandCanvasBounds(newImg.x + w, newImg.y + h);
               that.redrawCanvas();
-              that.markChanged();
+              that.commitEdit();
             });
           }
         });
@@ -1418,20 +1675,20 @@ Page({
 
   persistTempFile(tempFilePath, callback) {
     if (!tempFilePath || !wx.saveFile) {
-      callback(tempFilePath || '');
+      callback('');
       return;
     }
     wx.saveFile({
       tempFilePath,
-      success: res => callback(res.savedFilePath || tempFilePath),
-      fail: () => callback(tempFilePath)
+      success: res => callback(res.savedFilePath || ''),
+      fail: () => callback('')
     });
   },
 
   // ---------- 导出到相册 ----------
 
   exportImage() {
-    if (this.data.isExportingImage) return;
+    if (this.data.isExportingImage || this.data.isSavingBoard) return;
     if (!this.data.graphObjects || this.data.graphObjects.length === 0) {
       wx.showToast({ title: '画板为空', icon: 'none' });
       return;
@@ -1444,7 +1701,9 @@ Page({
       wx.showToast({ title: '广告未初始化，请稍后再试', icon: 'none' });
       return;
     }
+    const epoch = this.boardEpoch;
     this.exportImageAd.show((ok, message) => {
+      if (this.unloaded || this.boardEpoch !== epoch) return;
       if (!ok) {
         if (message) wx.showToast({ title: message, icon: 'none' });
         return;
@@ -1454,6 +1713,8 @@ Page({
   },
 
   doExportImage() {
+    if (this.data.isExportingImage || this.data.isSavingBoard) return;
+    this.touchEnd();
     const bounds = this.data.canvasBounds;
     const contentWidth = Math.max(bounds.maxX - bounds.minX, 1);
     const contentHeight = Math.max(bounds.maxY - bounds.minY, 1);
@@ -1552,7 +1813,7 @@ Page({
   // ---------- 保存 ----------
 
   saveBoard() {
-    if (this.data.isSavingBoard) return;
+    if (this.data.isSavingBoard || this.data.isExportingImage) return;
     if (this.data.graphObjects.length === 0 && !this.data.currentFileId) {
       wx.showToast({ title: '画板为空，无需保存', icon: 'none' });
       return;
@@ -1578,7 +1839,9 @@ Page({
       wx.showToast({ title: '广告未初始化，请稍后再试', icon: 'none' });
       return;
     }
+    const epoch = this.boardEpoch;
     this.saveFileAd.show((ok, message) => {
+      if (this.unloaded || this.boardEpoch !== epoch) return;
       if (!ok) {
         if (message) wx.showToast({ title: message, icon: 'none' });
         return;
@@ -1588,15 +1851,28 @@ Page({
   },
 
   doSaveBoard() {
+    if (this.data.isSavingBoard || this.data.isExportingImage) return;
+    this.touchEnd();
+    if (this.data.draftStatus !== 'saved') this.flushDraft();
+    const epoch = this.boardEpoch;
+    const revision = this.changeRevision;
+    const payload = {
+      id: this.data.currentFileId, name: this.data.fileName,
+      data: JSON.parse(JSON.stringify(this.buildBoardData()))
+    };
     this.setData({ isSavingBoard: true });
     wx.showLoading({ title: '正在保存...', mask: true });
 
     this.generateThumbnail(thumbnail => {
+      if (this.unloaded || epoch !== this.boardEpoch) {
+        wx.hideLoading();
+        return;
+      }
       const result = boardStore.saveFile({
-        id: this.data.currentFileId,
-        name: this.data.fileName,
+        id: payload.id,
+        name: payload.name,
         thumbnail,
-        data: this.buildBoardData()
+        data: payload.data
       });
       wx.hideLoading();
       this.setData({ isSavingBoard: false });
@@ -1606,11 +1882,18 @@ Page({
       }
       const app = getApp();
       if (app && app.globalData) app.globalData.currentEditingFileId = result.file.id;
+      const clean = revision === this.changeRevision && !this.editBefore;
       this.setData({
         currentFileId: result.file.id,
         fileName: result.file.name,
-        hasChanges: false
+        hasChanges: !clean
       });
+      if (clean) {
+        const cleared = this.discardDraft();
+        this.setData({ draftStatus: cleared ? '' : 'error', hasChanges: !cleared });
+        if (!cleared) this.flushDraft();
+      } else if (this.editBefore) this.scheduleDraft();
+      else this.flushDraft();
       wx.showToast({ title: '保存成功', icon: 'success' });
     });
   },
@@ -1627,6 +1910,7 @@ Page({
       brushState: this.data.brushState,
       tinctCurr: this.data.tinctCurr,
       tinctSize: this.data.tinctSize,
+      eraserSize: this.data.eraserSize,
       customColor: this.data.customColor || '',
       currentMode: this.data.currentMode
     };

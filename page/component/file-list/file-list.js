@@ -1,6 +1,7 @@
 const boardStore = require('../../../utils/boardStore');
 const rewardedVideoAd = require('../../../utils/rewardedVideoAd');
 const share = require('../../../utils/share');
+const geometry = require('../../../utils/strokeGeometry');
 
 function setStrokeStyleCompat(ctx, value) {
   if (!ctx) return;
@@ -294,19 +295,7 @@ Page({
   drawExportObject(ctx, obj) {
     if (!obj) return;
     if (obj.type === 'path') {
-      const points = obj.points || [];
-      if (!points.length) return;
-      const style = obj.style || {};
-      setStrokeStyleCompat(ctx, style.color || '#000000');
-      setLineWidthCompat(ctx, style.width || 1);
-      setLineCapCompat(ctx, 'round');
-      setLineJoinCompat(ctx, 'round');
-      ctx.beginPath();
-      ctx.moveTo(points[0].x + (obj.x || 0), points[0].y + (obj.y || 0));
-      for (let j = 1; j < points.length; j++) {
-        ctx.lineTo(points[j].x + (obj.x || 0), points[j].y + (obj.y || 0));
-      }
-      ctx.stroke();
+      geometry.drawPath(ctx, obj);
     } else if (obj.type === 'image' && obj.src) {
       ctx.drawImage(obj.src, obj.x, obj.y, obj.w, obj.h);
     }

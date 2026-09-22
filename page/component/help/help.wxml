@@ -15,7 +15,8 @@
   <view class="section-card">
     <view class="question">作品保存在哪里？</view>
     <view class="body-text">已保存的画板保存在当前设备的小程序本地数据中，不会自动同步到其他设备。清除小程序数据可能导致作品丢失，重要作品请及时导出到相册。</view>
-    <view class="body-text">绘画内容不会自动保存。离开小程序前，请先点击“保存”。</view>
+    <view class="body-text">停止操作约 1 秒后会自动保存当前草稿，切到后台时也会保存，下次打开可恢复。草稿只有一份，不占作品名额；新建或切换作品前，请将要保留的内容手动保存到“作品”。清除小程序数据会同时清除草稿。</view>
+    <view class="body-text">还原与重做保留本次编辑最近 60 步。还原会撤回刚刚的操作，重做会重新执行刚刚还原的操作；重新打开小程序或切换作品后不保留操作历史。橡皮擦除笔迹片段，图片可通过“选择 → 删除”移除。</view>
   </view>
   <view class="section-card">
     <view class="question">为什么保存或导出时会出现广告？</view>

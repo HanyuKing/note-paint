@@ -3,7 +3,7 @@
     <view class="tutorial-icon">
       <view class="tool-icon select-icon"></view>
     </view>
-    <view class="tutorial-text">选择：点选对象后可拖动位置；空白处单指拖动可平移视图。</view>
+    <view class="tutorial-text">选择：点选笔迹或图片后拖动位置，点击“删除”移除选中对象；空白处拖动可平移视图。</view>
   </view>
   <view class="tutorial-item">
     <view class="tutorial-icon"><view class="tool-icon gesture-icon"></view></view>
@@ -15,7 +15,11 @@
   </view>
   <view class="tutorial-item">
     <view class="tutorial-icon"><view class="tool-icon eraser-icon"></view></view>
-    <view class="tutorial-text">橡皮：使用白色笔迹覆盖已有内容。</view>
+    <view class="tutorial-text">橡皮：擦掉经过的笔迹片段，保留下面的图片；可调节橡皮大小。</view>
+  </view>
+  <view class="tutorial-item">
+    <view class="tutorial-icon"><view class="tool-icon undo-icon"></view></view>
+    <view class="tutorial-text">还原：撤回刚刚的操作；重做：重新执行刚刚还原的操作。支持绘画、擦除、移动和删除，最多保留最近 60 步。</view>
   </view>
   <view class="tutorial-item">
     <view class="tutorial-icon"><view class="tool-icon image-icon"></view></view>
@@ -23,7 +27,7 @@
   </view>
   <view class="tutorial-item">
     <view class="tutorial-icon"><view class="tool-icon save-icon"></view></view>
-    <view class="tutorial-text">保存：保存为可继续编辑的本地文件，可在“作品”中查看。</view>
+    <view class="tutorial-text">草稿会在停笔后自动保存到本机，下次打开可继续。点击“保存”将画板收入“作品”，供以后重新编辑。</view>
   </view>
   <view class="tutorial-item">
     <view class="tutorial-icon"><view class="tool-icon export-icon"></view></view>

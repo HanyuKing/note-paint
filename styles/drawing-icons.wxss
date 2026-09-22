@@ -4,6 +4,29 @@
   position: relative;
 }
 
+.delete-icon::before {
+  content: '';
+  position: absolute;
+  left: 11rpx;
+  top: 13rpx;
+  width: 22rpx;
+  height: 26rpx;
+  border: 3rpx solid currentColor;
+  border-radius: 0 0 5rpx 5rpx;
+}
+
+.delete-icon::after {
+  content: '';
+  position: absolute;
+  left: 7rpx;
+  top: 7rpx;
+  width: 33rpx;
+  height: 3rpx;
+  border-radius: 3rpx;
+  background: currentColor;
+  box-shadow: 0 -5rpx 0 -1rpx currentColor;
+}
+
 /* 新建: 加号 */
 .plus-icon::before,
 .plus-icon::after {
@@ -292,4 +315,3 @@
   top: 8rpx;
   transform: rotate(-16deg);
 }
-
