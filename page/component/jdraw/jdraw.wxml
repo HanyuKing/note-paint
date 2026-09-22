@@ -1,46 +1,51 @@
 <view class="jdraw">
   <view class="toolbar">
-    <view
-      class="tool {{currentMode=='select' ? 'active' : ''}}"
-      data-mode="select"
-      bindtap="switchMode"
-    >
-      <view class="tool-icon select-icon"></view>
-      <view class="tool-label">选择</view>
-    </view>
-    <view
-      class="tool {{currentMode=='draw' && brushState=='p' ? 'active' : ''}}"
-      data-state="p"
-      bindtap="switchBrush"
-    >
-      <view class="tool-icon pen-icon" style="color: {{currentPenIconColor}};">
-        <view class="pen-tip"></view>
+    <view class="tool-group tool-group-editing">
+      <view
+        class="tool {{currentMode=='select' ? 'active' : ''}}"
+        data-mode="select"
+        bindtap="switchMode"
+      >
+        <view class="tool-icon select-icon"></view>
+        <view class="tool-label">选择</view>
       </view>
-      <view class="tool-label">画笔</view>
+      <view
+        class="tool {{currentMode=='draw' && brushState=='p' ? 'active' : ''}}"
+        data-state="p"
+        bindtap="switchBrush"
+      >
+        <view class="tool-icon pen-icon" style="color: {{currentPenIconColor}};">
+          <view class="pen-tip"></view>
+        </view>
+        <view class="tool-label">画笔</view>
+      </view>
+      <view
+        class="tool {{currentMode=='draw' && brushState=='c' ? 'active' : ''}}"
+        data-state="c"
+        bindtap="switchBrush"
+      >
+        <view class="tool-icon eraser-icon"></view>
+        <view class="tool-label">橡皮</view>
+      </view>
     </view>
-    <view
-      class="tool {{currentMode=='draw' && brushState=='c' ? 'active' : ''}}"
-      data-state="c"
-      bindtap="switchBrush"
-    >
-      <view class="tool-icon eraser-icon"></view>
-      <view class="tool-label">橡皮</view>
-    </view>
-    <view class="tool" bindtap="chooseImage">
-      <view class="tool-icon image-icon"></view>
-      <view class="tool-label">插图</view>
-    </view>
-    <view class="tool" bindtap="saveBoard">
-      <view class="tool-icon save-icon"></view>
-      <view class="tool-label">保存</view>
-    </view>
-    <view class="tool" bindtap="exportImage">
-      <view class="tool-icon export-icon"></view>
-      <view class="tool-label">导出</view>
-    </view>
-    <view class="tool help-tool {{showTutorialDot ? 'help-tool-dot' : ''}}" bindtap="openTutorial">
-      <view class="tool-icon help-icon"></view>
-      <view class="tool-label">说明</view>
+
+    <view class="tool-group tool-group-actions">
+      <view class="tool" bindtap="chooseImage">
+        <view class="tool-icon image-icon"></view>
+        <view class="tool-label">插图</view>
+      </view>
+      <view class="tool" bindtap="saveBoard">
+        <view class="tool-icon save-icon"></view>
+        <view class="tool-label">保存</view>
+      </view>
+      <view class="tool" bindtap="exportImage">
+        <view class="tool-icon export-icon"></view>
+        <view class="tool-label">导出</view>
+      </view>
+      <view class="tool help-tool {{showTutorialDot ? 'help-tool-dot' : ''}}" bindtap="openTutorial">
+        <view class="tool-icon help-icon"></view>
+        <view class="tool-label">说明</view>
+      </view>
     </view>
   </view>
 
@@ -71,7 +76,7 @@
     </view>
     <view class="size-row">
       <view class="eraser-size-dot"></view>
-      <slider class="size-slider" value="{{eraserSize}}" min="8" max="80" bindchange="eraserSizeChange" activeColor="#111827" block-color="#FFFFFF" block-size="24" backgroundColor="#E5E7EB" />
+      <slider class="size-slider" value="{{eraserSize}}" min="8" max="80" bindchange="eraserSizeChange" activeColor="#2563EB" block-color="#FFFFFF" block-size="24" backgroundColor="#E5E7EB" />
       <view class="size-num">{{eraserSize}}px</view>
     </view>
   </view>
@@ -103,7 +108,7 @@
         min="1"
         max="10"
         bindchange="tinSizechange"
-        activeColor="#111827"
+        activeColor="#2563EB"
         block-color="#FFFFFF"
         block-size="24"
         backgroundColor="#E5E7EB"

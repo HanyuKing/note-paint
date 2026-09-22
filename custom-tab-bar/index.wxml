@@ -20,6 +20,8 @@
           class="tab-icon-img"
           src="{{selected === index ? item.selectedIconPath : item.iconPath}}"
           mode="aspectFit"
+          binderror="handleIconError"
+          data-index="{{index}}"
         ></image>
       </view>
       <view class="label">{{item.text}}</view>
